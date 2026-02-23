@@ -264,6 +264,15 @@ The TypedDict passed between nodes contains:
 3. Add prompt template in `paper_agent/prompts.py`
 4. Add CLI flag in main.py
 
+### Documentation Updates
+
+**IMPORTANT**: After any code changes, you MUST also update the relevant documentation files:
+
+1. **README.md** - Update usage examples, feature descriptions, and installation instructions if affected
+2. **docs/** - Update any related documentation files in the docs directory (API docs, architecture docs, user guides, etc.)
+
+This ensures that documentation stays synchronized with the codebase and users have accurate, up-to-date information.
+
 ## Key Design Decisions
 
 1. **State Management**: Extended AgentState with optional fields for backward compatibility
