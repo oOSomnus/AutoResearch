@@ -4,7 +4,29 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-AutoResearch is a LangGraph-based paper reading agent that analyzes academic papers and produces easy-to-understand Markdown reports. The agent extracts the "three elements" of a paper: background & motivation, innovation & core theory, and results & conclusions.
+AutoResearch is a LangGraph-based intelligent paper reading agent that analyzes academic papers and produces easy-to-understand reports. The agent supports multiple output formats, bilingual analysis, resumable workflows, and advanced content extraction.
+
+### Core Features
+
+**Basic Analysis Dimensions**:
+- Background & motivation - Why was this research done?
+- Innovation & core theory - What are the new contributions?
+- Results & conclusions - What were the findings?
+
+**Extended Analysis Dimensions** (dynamically selected based on paper type):
+- Methodology - Experimental papers: experimental design and analysis
+- Related work - Survey papers: research trends and domain overview
+- Limitations - Theoretical papers: method limitations and future directions
+
+**Advanced Features**:
+- Multi-format output: Markdown, HTML, PDF, JSON
+- Bilingual support: Chinese/English
+- Detail level control: brief/standard/detailed
+- Resumable analysis: checkpoint save and restore
+- Batch processing: multi-paper batch analysis
+- Interactive Q&A: RAG-based paper questioning
+- Content extraction: citation analysis, figure analysis, code extraction, reproducibility assessment
+- Cache optimization: result caching for faster repeat analysis
 
 ## Setup
 
@@ -22,6 +44,14 @@ Required environment variables (in `.env`):
 - `OPENAI_API_KEY` - API authentication key
 - `MODEL_NAME` - Model to use (default: gpt-4)
 
+Optional dependencies for enhanced features:
+- `matplotlib>=3.8.0` - Chart generation
+- `weasyprint>=60.0` - PDF output
+- `rich>=13.7.0` - Enhanced terminal UI
+- `tqdm>=4.66.0` - Progress bars
+- `tiktoken>=0.5.0` - Token counting
+- `diskcache>=5.6.0` - Persistent caching
+
 ## Running the Agent
 
 ```bash
@@ -32,45 +62,232 @@ python main.py
 python main.py ./paper.pdf
 python main.py https://arxiv.org/pdf/xxxx.pdf
 
+# Specify output format
+python main.py --format html ./paper.pdf
+python main.py --format pdf ./paper.pdf
+
+# Specify language
+python main.py --language en ./paper.pdf
+
+# Specify detail level
+python main.py --detail brief ./paper.pdf
+
+# Batch processing
+python main.py --batch papers_list.txt
+
+# View history
+python main.py --history
+
+# Enable advanced features
+python main.py --extract-citations ./paper.pdf
+python main.py --analyze-figures ./paper.pdf
+python main.py --extract-code ./paper.pdf
+python main.py --assess-reproducibility ./paper.pdf
+
+# Multi-paper comparison
+python main.py --compare paper1.pdf paper2.pdf
+
+# Resume from checkpoint
+python main.py --resume checkpoint.json
+
+# Clear cache
+python main.py --clear-cache
+
 # Run graph directly (for testing)
 python -m paper_agent.graph <pdf_path_or_url>
 ```
 
 ## Architecture
 
-The project uses **LangGraph** to orchestrate a sequential workflow through 7 nodes:
+The project uses **LangGraph** to orchestrate a conditional branching workflow through multiple nodes:
 
-1. **fetch_pdf** (`paper_agent/nodes.py`) - Downloads PDF from URL or validates local file, extracts title
-2. **extract_content** - Extracts text from PDF (limited to 30k chars to avoid token limits)
-3. **analyze_background** - Uses LLM to analyze research background and motivation
-4. **analyze_innovation** - Uses LLM to analyze innovation and core theory
-5. **analyze_results** - Uses LLM to analyze results and conclusions
-6. **generate_report** - Combines all analyses into a Markdown report
-7. **save_report** - Saves report to current directory as `<filename>_report.md`
+**Core Workflow Nodes**:
+1. **fetch_pdf** - Downloads PDF from URL or validates local file, extracts title
+2. **extract_content** - Extracts text from PDF and chapters
+3. **detect_paper_type** - Detects paper type (survey/experimental/theoretical)
+4. **analyze_background** - Uses LLM to analyze research background and motivation
+5. **analyze_innovation** - Uses LLM to analyze innovation and core theory
+6. **analyze_methodology** - Uses LLM to analyze experimental methodology (for experimental papers)
+7. **analyze_related_work** - Uses LLM to analyze related work (for survey papers)
+8. **analyze_limitations** - Uses LLM to analyze limitations (for theoretical papers)
+9. **analyze_results** - Uses LLM to analyze results and conclusions
+10. **generate_report** - Combines all analyses into a report using formatters
+11. **save_report** - Saves report to current directory
+
+**Advanced Extraction Nodes** (optional):
+- **extract_citations** - Extract and analyze citations
+- **analyze_figures** - Analyze figures and tables
+- **extract_code** - Extract code snippets and algorithms
+- **assess_reproducibility** - Assess paper reproducibility
+
+### Workflow Paths
+
+- **Survey papers**: background → related_work → innovation → results
+- **Experimental papers**: background → innovation → methodology → results
+- **Theoretical/Unknown papers**: background → innovation → limitations → results
 
 ### Module Structure
 
-- **`paper_agent/graph.py`** - Defines the StateGraph workflow with `AgentState` and connects all nodes sequentially. Entry point is `fetch_pdf`, exit point is `save_report`.
-- **`paper_agent/nodes.py`** - Contains all 7 node functions. Each node accepts `AgentState` and returns updated `AgentState`. Uses `get_llm()` to create LangChain `ChatOpenAI` instances.
-- **`paper_agent/prompts.py`** - Chinese prompt templates for each analysis phase. All prompts emphasize simple, non-academic language accessible to high school graduates.
-- **`paper_agent/pdf_reader.py`** - PDF extraction utilities using PyPDF2, plus URL download via requests. Handles title extraction from PDF metadata or first page.
+**Core Layer**:
+- **`paper_agent/graph.py`** - Defines the StateGraph workflow with conditional routing based on paper type
+- **`paper_agent/nodes.py`** - Contains all node functions with checkpoint and cache integration
+- **`paper_agent/prompts.py`** - Bilingual prompt templates (Chinese/English) for each analysis phase
+
+**Processing Layer**:
+- **`paper_agent/pdf_reader.py`** - PDF extraction utilities using PyPDF2, plus URL download
+- **`paper_agent/chunking.py`** - Chapter extraction and intelligent content selection
+
+**Output Layer**:
+- **`paper_agent/formatters/`** - Report output formatters
+  - `base_formatter.py` - Abstract base class
+  - `markdown_formatter.py` - Markdown output (default)
+  - `html_formatter.py` - HTML output with MathJax support
+  - `pdf_formatter.py` - PDF output via weasyprint
+  - `json_formatter.py` - Structured JSON output
+  - `bilingual_formatter.py` - Language switching wrapper
+  - `chart_generator.py` - matplotlib-based chart generation
+
+**Enhancement Layer**:
+- **`paper_agent/cache.py`** - Cache manager for analysis results
+- **`paper_agent/checkpoint.py`** - Checkpoint management for resumable analysis
+- **`paper_agent/progress.py`** - Progress tracking with tqdm
+- **`paper_agent/history.py`** - SQLite-based analysis history management
+- **`paper_agent/batch.py` - Batch processing coordinator
+- **`paper_agent/qa_mode.py` - Interactive RAG-based Q&A mode
+- **`paper_agent/ui.py` - Rich terminal UI with fallback support
+
+**Analysis Layer**:
+- **`paper_agent/extractors/`** - Content extractors
+  - `citation_extractor.py` - Citation extraction and analysis
+  - `figure_extractor.py` - Figure/table extraction
+  - `code_extractor.py` - Code/algorithm extraction
+  - `reproducibility_analyzer.py` - Reproducibility assessment
+- **`paper_agent/comparison.py`** - Multi-paper comparison
+- **`paper_agent/research_assistant.py`** - Research assistant mode
+
+**Support Layer**:
+- **`paper_agent/config.py`** - Configuration management
+- **`paper_agent/types.py`** - Data structure definitions
+- **`paper_agent/cache/`** - Caching utilities (LRU cache, disk cache)
+- **`paper_agent/retry.py` - Exponential backoff retry logic
 
 ### AgentState
 
 The TypedDict passed between nodes contains:
+
+**Core Fields**:
 - `source` - Original file path or URL
 - `pdf_path` - Local path to PDF file
 - `title` - Extracted paper title
-- `content` - Extracted PDF text (max 30k chars)
+- `content` - Extracted PDF text
+- `chapters` - List of extracted chapters with type info
+- `paper_type` - Paper type: survey/experimental/theoretical/unknown
 - `background` - Analysis result for background
 - `innovation` - Analysis result for innovation
 - `results` - Analysis result for results
-- `report` - Final Markdown report
+- `methodology` - Analysis result for methodology
+- `related_work` - Analysis result for related work
+- `limitations` - Analysis result for limitations
+- `report` - Final formatted report
+
+**Output Configuration**:
+- `output_format` - Output format: markdown/html/pdf/json
+- `language` - Target language: zh/en
+- `detail_level` - Detail level: brief/standard/detailed
+
+**Extraction Fields** (Phase 4):
+- `citations` - Citation analysis text
+- `figures` - Figure analysis text
+- `code` - Code extraction text
+- `reproducibility` - Reproducibility assessment text
+- `citations_list` - List of CitationInfo objects
+- `figures_list` - List of FigureInfo objects
+- `code_snippets` - List of CodeSnippet objects
+- `reproducibility_score` - Reproducibility score (0-1)
+
+**Progress & Checkpoint Fields** (Phase 2):
+- `completed_nodes` - List of completed node names
+- `checkpoint_path` - Path to checkpoint file
+- `cache_key` - Cache key for the analysis
 
 ## Development Notes
 
-- The project uses LangChain's `ChatOpenAI` for LLM calls, supporting any OpenAI-compatible API
-- PDF content is truncated to 30k characters (~10k tokens) to stay within model limits
-- Prompts are designed to produce simple, conversational Chinese output - this is intentional, not a bug
-- Error handling in nodes includes fallback to raw text formatting if LLM fails
-- The workflow is strictly sequential (no branching or cycles) - nodes execute in order and pass state linearly
+### Workflow Design
+
+- The project uses LangGraph conditional branching based on paper type
+- Workflows adapt dynamically: survey, experimental, and theoretical papers take different analysis paths
+- All nodes support checkpoint saving and cache checking for resumability
+
+### Content Processing
+
+- Uses chapter-based extraction to handle long papers (no 30k character limit)
+- Content selection is optimized per analysis type for better accuracy
+- PDF hash is calculated for cache key generation
+
+### Prompts
+
+- All prompts are designed for simple, conversational output accessible to high school graduates
+- Bilingual prompts are available for both Chinese and English
+- Detail level modifiers control output verbosity
+
+### Output Formats
+
+- Default: Markdown
+- HTML: Supports MathJax for LaTeX rendering, responsive design
+- PDF: Generated via HTML conversion using weasyprint (optional dependency)
+- JSON: Structured output with all analysis data
+
+### Error Handling
+
+- Nodes include fallback mechanisms when LLM fails
+- Optional dependencies gracefully degrade to simple functionality
+- Cache and checkpoint systems help with recovery and debugging
+
+### Extensibility
+
+**Adding a new node**:
+1. Add node function in `paper_agent/nodes.py`
+2. Update `AgentState` in `paper_agent/nodes.py` if needed
+3. Add routing function in `paper_agent/graph.py`
+4. Add node to workflow in `create_paper_agent_graph()`
+5. Add prompt template in `paper_agent/prompts.py`
+
+**Adding a new output format**:
+1. Create new formatter class in `paper_agent/formatters/` inheriting from `BaseFormatter`
+2. Implement `format_report()` method
+3. Add to formatters `__init__.py`
+4. Update main.py CLI options
+
+**Adding a new extraction feature**:
+1. Create extractor class in `paper_agent/extractors/`
+2. Add corresponding node function in `paper_agent/nodes.py`
+3. Add prompt template in `paper_agent/prompts.py`
+4. Add CLI flag in main.py
+
+## Key Design Decisions
+
+1. **State Management**: Extended AgentState with optional fields for backward compatibility
+2. **Caching Strategy**: Dual-layer caching (memory LRU + persistent disk) with content-based keys
+3. **Parallel Execution**: Independent analysis nodes can be parallelized in future
+4. **Bilingual Support**: Language switching mode (--language parameter) for single-language output
+5. **Default Cache**: Results are cached by default for improved performance
+
+## Dependencies
+
+**Core Dependencies**:
+- langgraph>=0.2.0
+- langchain>=0.3.0
+- langchain-openai>=0.2.0
+- PyPDF2>=3.0.0
+- requests>=2.31.0
+- python-dotenv>=1.0.0
+- chromadb>=0.4.0
+
+**Optional Dependencies**:
+- weasyprint>=60.0 - PDF output
+- matplotlib>=3.8.0 - Chart generation
+- tqdm>=4.66.0 - Progress bars
+- rich>=13.7.0 - Enhanced terminal UI
+- click>=8.1.0 - CLI framework
+- tiktoken>=0.5.0 - Token counting
+- diskcache>=5.6.0 - Persistent caching

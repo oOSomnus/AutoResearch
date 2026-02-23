@@ -1,7 +1,9 @@
 """
 Graph Module - LangGraph workflow definition for the paper reading agent.
+Supports checkpoint recovery, caching, and output configuration.
 """
 from langgraph.graph import StateGraph, END
+from typing import Dict, Any, Optional, List
 
 from .nodes import (
     AgentState,
@@ -169,37 +171,88 @@ def create_paper_agent_graph():
     return app
 
 
-def run_paper_analysis(source: str):
+def run_paper_analysis(source: str,
+                      output_format: str = "markdown",
+                      language: str = "zh",
+                      detail_level: str = "standard",
+                      checkpoint_path: Optional[str] = None) -> Dict[str, Any]:
     """
     Run the complete paper analysis workflow.
 
     Args:
         source: Path to local PDF file or URL to download from
+        output_format: Output format (markdown, html, pdf, json)
+        language: Language for analysis (zh, en)
+        detail_level: Detail level (brief, standard, detailed)
+        checkpoint_path: Optional path to resume from checkpoint
 
     Returns:
         The final state with the analysis results
     """
-    app = create_paper_agent_graph()
+    # Check if resuming from checkpoint
+    if checkpoint_path:
+        from .checkpoint import get_checkpoint_manager
+        checkpoint_mgr = get_checkpoint_manager()
+        initial_state = checkpoint_mgr.load_checkpoint(checkpoint_path)
 
-    # Initial state with all required fields
-    initial_state = {
-        "source": source,
-        "pdf_path": "",
-        "content": "",
-        "background": "",
-        "innovation": "",
-        "results": "",
-        "report": "",
-        "title": "",
-        "chapters": [],
-        "paper_type": "",
-        "methodology": "",
-        "related_work": "",
-        "limitations": ""
-    }
+        if initial_state:
+            print(f"📋 从检查点恢复: {checkpoint_path}")
+            print(f"   已完成节点: {initial_state.get('completed_nodes', [])}")
+        else:
+            print(f"⚠️  检查点无效，从头开始分析")
+            initial_state = None
+    else:
+        initial_state = None
+
+    # If no checkpoint, create initial state
+    if initial_state is None:
+        initial_state = {
+            "source": source,
+            "pdf_path": "",
+            "content": "",
+            "background": "",
+            "innovation": "",
+            "results": "",
+            "report": "",
+            "title": "",
+            "chapters": [],
+            "paper_type": "",
+            "methodology": "",
+            "related_work": "",
+            "limitations": "",
+            # Output configuration
+            "output_format": output_format,
+            "language": language,
+            "detail_level": detail_level,
+            # New extraction dimensions
+            "citations": "",
+            "figures": "",
+            "code": "",
+            "reproducibility": "",
+            "citations_list": [],
+            "figures_list": [],
+            "code_snippets": [],
+            "reproducibility_score": 0.0,
+            # Progress and checkpoint fields
+            "completed_nodes": [],
+            "checkpoint_path": "",
+            "cache_key": ""
+        }
+
+    app = create_paper_agent_graph()
 
     # Run the workflow
     final_state = app.invoke(initial_state)
+
+    # Save to history if analysis completed successfully
+    if final_state.get("report"):
+        try:
+            from .history import get_history_manager
+            history_mgr = get_history_manager()
+            history_mgr.add_entry(final_state)
+        except Exception:
+            # History saving is optional, don't fail the workflow
+            pass
 
     return final_state
 
