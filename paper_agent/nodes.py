@@ -3,7 +3,7 @@ Node Functions - Individual processing functions for the LangGraph workflow.
 """
 import os
 import hashlib
-from typing import TypedDict
+from typing import TypedDict, List
 
 from langchain_openai import ChatOpenAI
 
@@ -12,8 +12,13 @@ from .prompts import (
     get_background_prompt,
     get_innovation_prompt,
     get_results_prompt,
-    get_report_prompt
+    get_report_prompt,
+    get_paper_type_detection_prompt,
+    get_methodology_prompt,
+    get_related_work_prompt,
+    get_limitations_prompt
 )
+from .chunking import extract_chapters, get_relevant_content_for_analysis
 
 
 class AgentState(TypedDict):
@@ -26,6 +31,12 @@ class AgentState(TypedDict):
     report: str
     title: str
     source: str
+    # New fields for enhanced analysis
+    chapters: List  # Extracted chapters list
+    paper_type: str  # 'survey', 'experimental', 'theoretical', 'unknown'
+    methodology: str  # Experimental methodology analysis
+    related_work: str  # Related work analysis
+    limitations: str  # Limitations analysis
 
 
 def get_llm():
@@ -76,39 +87,95 @@ def fetch_pdf(state: AgentState) -> AgentState:
 
 def extract_content(state: AgentState) -> AgentState:
     """
-    Node 2: Extract text content from PDF.
+    Node 2: Extract text content from PDF and extract chapters.
     """
     pdf_path = state["pdf_path"]
 
-    print("📖 正在提取PDF内容...")
+    print("📖 正在提取PDF内容和章节...")
 
     try:
+        # Extract full content
         content = extract_pdf_text(pdf_path)
-        # Limit content length to avoid token limits
-        max_chars = 30000  # Approx 10k tokens
-        if len(content) > max_chars:
-            content = content[:max_chars]
-            print(f"⚠️  内容过长，截取前 {max_chars} 字符")
+
+        # Extract chapters for intelligent chunking
+        chapters = extract_chapters(pdf_path)
 
         print(f"✅ 提取了 {len(content)} 个字符")
+        print(f"✅ 识别了 {len(chapters)} 个章节:")
+        for chapter in chapters:
+            chapter_info = f"  - {chapter.title}"
+            if chapter.chapter_type:
+                chapter_info += f" [{chapter.chapter_type}]"
+            if chapter.page_range:
+                chapter_info += f" (页码 {chapter.page_range[0]}-{chapter.page_range[1]})"
+            print(chapter_info)
+
     except Exception as e:
         print(f"❌ 提取内容失败: {e}")
-        raise
+        content = ""
+        chapters = []
 
     state["content"] = content
+    state["chapters"] = chapters
+    return state
+
+
+def detect_paper_type(state: AgentState) -> AgentState:
+    """
+    Node 3: Detect paper type using LLM based on title and content.
+    """
+    title = state["title"]
+    content = state["content"]
+
+    print("🔬 正在检测论文类型...")
+
+    try:
+        llm = get_llm()
+        prompt = get_paper_type_detection_prompt(title, content)
+        response = llm.invoke(prompt)
+
+        # Handle different response formats
+        paper_type = None
+        if hasattr(response, 'content'):
+            paper_type = str(response.content).strip().lower()
+        elif isinstance(response, str):
+            paper_type = response.strip().lower()
+        elif hasattr(response, 'to_string'):
+            paper_type = response.to_string().strip().lower()
+
+        # Validate and normalize the paper type
+        valid_types = ['survey', 'experimental', 'theoretical', 'unknown']
+        if not paper_type or paper_type not in valid_types:
+            paper_type = 'unknown'
+
+        print(f"✅ 论文类型检测完成: {paper_type}")
+    except Exception as e:
+        print(f"❌ 论文类型检测失败: {e}")
+        paper_type = 'unknown'
+
+    state["paper_type"] = paper_type
     return state
 
 
 def analyze_background(state: AgentState) -> AgentState:
     """
-    Node 3: Analyze the background and motivation of the research.
+    Node 4: Analyze the background and motivation of the research.
+    Uses chapter-based content for more focused analysis.
     """
-    content = state["content"]
+    chapters = state.get("chapters", [])
+    content = state.get("content", "")
 
     print("🔍 正在分析背景&原因...")
 
     try:
         llm = get_llm()
+
+        # Use chapter-based content if available
+        if chapters:
+            relevant_content = get_relevant_content_for_analysis(chapters, 'background')
+            if relevant_content:
+                content = relevant_content
+
         prompt = get_background_prompt(content)
         response = llm.invoke(prompt)
         background = response.content.strip()
@@ -147,14 +214,23 @@ def analyze_innovation(state: AgentState) -> AgentState:
 
 def analyze_results(state: AgentState) -> AgentState:
     """
-    Node 5: Analyze the results and conclusions of the research.
+    Node 6: Analyze the results and conclusions of the research.
+    Uses chapter-based content for more focused analysis.
     """
-    content = state["content"]
+    chapters = state.get("chapters", [])
+    content = state.get("content", "")
 
     print("📊 正在分析结果...")
 
     try:
         llm = get_llm()
+
+        # Use chapter-based content if available
+        if chapters:
+            relevant_content = get_relevant_content_for_analysis(chapters, 'results')
+            if relevant_content:
+                content = relevant_content
+
         prompt = get_results_prompt(content)
         response = llm.invoke(prompt)
         results = response.content.strip()
@@ -168,21 +244,129 @@ def analyze_results(state: AgentState) -> AgentState:
     return state
 
 
+def analyze_methodology(state: AgentState) -> AgentState:
+    """
+    Node: Analyze the experimental methodology of the research.
+    """
+    chapters = state.get("chapters", [])
+    content = state.get("content", "")
+
+    print("🔬 正在分析实验方法...")
+
+    try:
+        llm = get_llm()
+
+        # Use chapter-based content if available
+        if chapters:
+            relevant_content = get_relevant_content_for_analysis(chapters, 'methodology')
+            if relevant_content:
+                content = relevant_content
+
+        prompt = get_methodology_prompt(content)
+        response = llm.invoke(prompt)
+        methodology = response.content.strip()
+
+        print("✅ 实验方法分析完成")
+    except Exception as e:
+        print(f"❌ 实验方法分析失败: {e}")
+        methodology = f"分析失败: {str(e)}"
+
+    state["methodology"] = methodology
+    return state
+
+
+def analyze_related_work(state: AgentState) -> AgentState:
+    """
+    Node: Analyze the related work of the research.
+    """
+    chapters = state.get("chapters", [])
+    content = state.get("content", "")
+
+    print("📚 正在分析相关工作...")
+
+    try:
+        llm = get_llm()
+
+        # Use chapter-based content if available
+        if chapters:
+            relevant_content = get_relevant_content_for_analysis(chapters, 'related_work')
+            if relevant_content:
+                content = relevant_content
+
+        prompt = get_related_work_prompt(content)
+        response = llm.invoke(prompt)
+        related_work = response.content.strip()
+
+        print("✅ 相关工作分析完成")
+    except Exception as e:
+        print(f"❌ 相关工作分析失败: {e}")
+        related_work = f"分析失败: {str(e)}"
+
+    state["related_work"] = related_work
+    return state
+
+
+def analyze_limitations(state: AgentState) -> AgentState:
+    """
+    Node: Analyze the limitations of the research.
+    """
+    chapters = state.get("chapters", [])
+    content = state.get("content", "")
+
+    print("⚠️  正在分析局限性...")
+
+    try:
+        llm = get_llm()
+
+        # Use chapter-based content if available
+        if chapters:
+            relevant_content = get_relevant_content_for_analysis(chapters, 'limitations')
+            if relevant_content:
+                content = relevant_content
+
+        prompt = get_limitations_prompt(content)
+        response = llm.invoke(prompt)
+        limitations = response.content.strip()
+
+        print("✅ 局限性分析完成")
+    except Exception as e:
+        print(f"❌ 局限性分析失败: {e}")
+        limitations = f"分析失败: {str(e)}"
+
+    state["limitations"] = limitations
+    return state
+
+
 def generate_report(state: AgentState) -> AgentState:
     """
-    Node 6: Generate the final Markdown report.
+    Node: Generate the final Markdown report.
+    Dynamically generates report based on available analysis results.
     """
     title = state["title"]
     source = state["source"]
-    background = state["background"]
-    innovation = state["innovation"]
-    results = state["results"]
+    background = state.get("background", "")
+    innovation = state.get("innovation", "")
+    results = state.get("results", "")
+    paper_type = state.get("paper_type", "unknown")
+    methodology = state.get("methodology", "")
+    related_work = state.get("related_work", "")
+    limitations = state.get("limitations", "")
 
     print("📝 正在生成报告...")
 
     try:
         llm = get_llm()
-        prompt = get_report_prompt(title, source, background, innovation, results)
+        prompt = get_report_prompt(
+            title=title,
+            source=source,
+            background=background,
+            innovation=innovation,
+            results=results,
+            paper_type=paper_type,
+            methodology=methodology,
+            related_work=related_work,
+            limitations=limitations
+        )
         response = llm.invoke(prompt)
         report = response.content.strip()
 
@@ -190,21 +374,19 @@ def generate_report(state: AgentState) -> AgentState:
     except Exception as e:
         print(f"❌ 报告生成失败: {e}")
         # Fallback: generate a simple report without LLM
-        report = f"""# 论文分析报告
+        sections = [f"# 论文分析报告\n\n## 原始信息\n- 来源: {source}\n- 标题: {title}\n- 类型: {paper_type}"]
+        sections.append(f"\n## 一、背景&原因\n{background}")
+        sections.append(f"\n## 二、创新&核心理论\n{innovation}")
+        sections.append(f"\n## 三、结果\n{results}")
 
-## 原始信息
-- 来源: {source}
-- 标题: {title}
+        if methodology:
+            sections.append(f"\n## 四、实验方法\n{methodology}")
+        if related_work:
+            sections.append(f"\n## 四、相关工作\n{related_work}")
+        if limitations:
+            sections.append(f"\n## 四、局限性\n{limitations}")
 
-## 一、背景&原因
-{background}
-
-## 二、创新&核心理论
-{innovation}
-
-## 三、结果
-{results}
-"""
+        report = "\n".join(sections)
 
     state["report"] = report
     return state

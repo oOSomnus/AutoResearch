@@ -7,26 +7,75 @@ from .nodes import (
     AgentState,
     fetch_pdf,
     extract_content,
+    detect_paper_type,
     analyze_background,
     analyze_innovation,
+    analyze_methodology,
     analyze_results,
+    analyze_related_work,
+    analyze_limitations,
     generate_report,
     save_report
 )
+
+
+def route_to_background(state: AgentState) -> str:
+    """Route from paper type detection to background analysis."""
+    return "analyze_background"
+
+
+def route_from_background(state: AgentState) -> str:
+    """Route from background to next analysis based on paper type."""
+    paper_type = state.get("paper_type", "unknown")
+
+    if paper_type == "survey":
+        return "analyze_related_work"
+    elif paper_type == "experimental":
+        return "analyze_innovation"
+    else:  # theoretical or unknown
+        return "analyze_innovation"
+
+
+def route_from_related_work(state: AgentState) -> str:
+    """Route from related work to innovation (for survey papers)."""
+    return "analyze_innovation"
+
+
+def route_from_innovation(state: AgentState) -> str:
+    """Route from innovation to next analysis based on paper type."""
+    paper_type = state.get("paper_type", "unknown")
+
+    if paper_type == "survey":
+        return "analyze_results"
+    elif paper_type == "experimental":
+        return "analyze_methodology"
+    else:  # theoretical or unknown
+        return "analyze_limitations"
+
+
+def route_from_methodology(state: AgentState) -> str:
+    """Route from methodology to results (for experimental papers)."""
+    return "analyze_results"
+
+
+def route_from_limitations(state: AgentState) -> str:
+    """Route from limitations to results (for theoretical/unknown papers)."""
+    return "analyze_results"
+
+
+def route_to_report(state: AgentState) -> str:
+    """Route from any analysis node to report generation."""
+    return "generate_report"
 
 
 def create_paper_agent_graph():
     """
     Create and return the LangGraph workflow for paper analysis.
 
-    The workflow consists of 7 sequential nodes:
-    1. fetch_pdf - Get/download the PDF file
-    2. extract_content - Extract text from PDF
-    3. analyze_background - Analyze background & motivation
-    4. analyze_innovation - Analyze innovation & core theory
-    5. analyze_results - Analyze results & conclusions
-    6. generate_report - Generate Markdown report
-    7. save_report - Save report to file
+    The workflow uses conditional branching based on paper type:
+    - Survey papers: background -> related_work -> innovation -> results
+    - Experimental papers: background -> innovation -> methodology -> results
+    - Theoretical/Unknown papers: background -> innovation -> limitations -> results
 
     Returns:
         Compiled StateGraph ready for execution
@@ -37,21 +86,80 @@ def create_paper_agent_graph():
     # Add all nodes
     workflow.add_node("fetch_pdf", fetch_pdf)
     workflow.add_node("extract_content", extract_content)
+    workflow.add_node("detect_paper_type", detect_paper_type)
     workflow.add_node("analyze_background", analyze_background)
     workflow.add_node("analyze_innovation", analyze_innovation)
+    workflow.add_node("analyze_methodology", analyze_methodology)
     workflow.add_node("analyze_results", analyze_results)
+    workflow.add_node("analyze_related_work", analyze_related_work)
+    workflow.add_node("analyze_limitations", analyze_limitations)
     workflow.add_node("generate_report", generate_report)
     workflow.add_node("save_report", save_report)
 
     # Define the entry point
     workflow.set_entry_point("fetch_pdf")
 
-    # Define edges between nodes (sequential workflow)
+    # Define initial sequential edges
     workflow.add_edge("fetch_pdf", "extract_content")
-    workflow.add_edge("extract_content", "analyze_background")
-    workflow.add_edge("analyze_background", "analyze_innovation")
-    workflow.add_edge("analyze_innovation", "analyze_results")
-    workflow.add_edge("analyze_results", "generate_report")
+    workflow.add_edge("extract_content", "detect_paper_type")
+
+    # Route from paper type detection to background analysis
+    workflow.add_conditional_edges(
+        "detect_paper_type",
+        route_to_background,
+        {"analyze_background": "analyze_background"}
+    )
+
+    # Conditional branching from background based on paper type
+    workflow.add_conditional_edges(
+        "analyze_background",
+        route_from_background,
+        {
+            "analyze_related_work": "analyze_related_work",
+            "analyze_innovation": "analyze_innovation"
+        }
+    )
+
+    # Route from related work to innovation (survey papers only)
+    workflow.add_conditional_edges(
+        "analyze_related_work",
+        route_from_related_work,
+        {"analyze_innovation": "analyze_innovation"}
+    )
+
+    # Route from innovation based on paper type
+    workflow.add_conditional_edges(
+        "analyze_innovation",
+        route_from_innovation,
+        {
+            "analyze_results": "analyze_results",
+            "analyze_methodology": "analyze_methodology",
+            "analyze_limitations": "analyze_limitations"
+        }
+    )
+
+    # Route from methodology to results (experimental papers)
+    workflow.add_conditional_edges(
+        "analyze_methodology",
+        route_from_methodology,
+        {"analyze_results": "analyze_results"}
+    )
+
+    # Route from limitations to results (theoretical/unknown papers)
+    workflow.add_conditional_edges(
+        "analyze_limitations",
+        route_from_limitations,
+        {"analyze_results": "analyze_results"}
+    )
+
+    # All analysis nodes converge to report generation
+    workflow.add_conditional_edges(
+        "analyze_results",
+        route_to_report,
+        {"generate_report": "generate_report"}
+    )
+
+    # Final edge to save report
     workflow.add_edge("generate_report", "save_report")
     workflow.add_edge("save_report", END)
 
@@ -73,7 +181,7 @@ def run_paper_analysis(source: str):
     """
     app = create_paper_agent_graph()
 
-    # Initial state
+    # Initial state with all required fields
     initial_state = {
         "source": source,
         "pdf_path": "",
@@ -82,7 +190,12 @@ def run_paper_analysis(source: str):
         "innovation": "",
         "results": "",
         "report": "",
-        "title": ""
+        "title": "",
+        "chapters": [],
+        "paper_type": "",
+        "methodology": "",
+        "related_work": "",
+        "limitations": ""
     }
 
     # Run the workflow
