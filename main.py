@@ -7,7 +7,7 @@ import os
 import sys
 import argparse
 
-from paper_agent.graph import run_paper_analysis
+from paper_agent.graph import run_paper_analysis, run_adaptive_paper_analysis, create_interactive_paper_agent_graph
 
 
 def print_banner():
@@ -152,7 +152,12 @@ def direct_mode(source: str, output_format: str = "markdown",
                analyze_figures: bool = False,
                extract_code: bool = False,
                assess_reproducibility: bool = False,
-               qa_mode: bool = False):
+               qa_mode: bool = False,
+               adaptive: bool = False,
+               interactive: bool = False,
+               max_iterations: int = 3,
+               quality_threshold: float = 0.75,
+               user_feedback: bool = False):
     """Run the agent in direct mode with a specified source."""
     print_banner()
     print(f"📎 分析源: {source}")
@@ -162,6 +167,12 @@ def direct_mode(source: str, output_format: str = "markdown",
 
     if checkpoint_path:
         print(f"📋 从检查点恢复: {checkpoint_path}")
+
+    # Phase 5: Adaptive analysis mode
+    if adaptive:
+        print(f"🧠 启用自适应分析模式")
+        print(f"   最大迭代次数: {max_iterations}")
+        print(f"   质量阈值: {quality_threshold}")
 
     extraction_features = []
     if extract_citations:
@@ -174,6 +185,10 @@ def direct_mode(source: str, output_format: str = "markdown",
         extraction_features.append("可复现性评估")
     if qa_mode:
         extraction_features.append("问答模式")
+    if interactive:
+        extraction_features.append("交互式对话模式")
+    if user_feedback:
+        extraction_features.append("用户反馈模式")
 
     if extraction_features:
         print(f"🔧 启用功能: {', '.join(extraction_features)}")
@@ -181,16 +196,110 @@ def direct_mode(source: str, output_format: str = "markdown",
     print("-" * 60)
 
     try:
-        final_state = run_paper_analysis(
-            source,
-            output_format=output_format,
-            language=language,
-            detail_level=detail_level,
-            checkpoint_path=checkpoint_path
-        )
+        # Choose the appropriate analysis mode
+        if interactive:
+            # Interactive Q&A mode
+            print("\n🎙️  启动交互式问答模式")
+            print("分析完成后，您可以向系统提问关于论文的问题。")
+            print("输入 'exit' 或 'quit' 退出。\n")
 
-        # If QA mode is enabled, run interactive Q&A
-        if qa_mode and final_state.get("report"):
+            # Run initial analysis first
+            initial_state = run_adaptive_paper_analysis(
+                source,
+                output_format=output_format,
+                language=language,
+                detail_level=detail_level,
+                checkpoint_path=checkpoint_path,
+                max_iterations=2,  # Fewer iterations for interactive mode
+                quality_threshold=0.7,
+                research_mode="interactive"
+            )
+
+            # Now start interactive Q&A
+            from langchain_core.messages import HumanMessage, AIMessage
+
+            interactive_state = {
+                "source": source,
+                "pdf_path": initial_state.get("pdf_path", ""),
+                "content": initial_state.get("content", ""),
+                "title": initial_state.get("title", ""),
+                "chapters": initial_state.get("chapters", []),
+                "paper_type": initial_state.get("paper_type", "unknown"),
+                "background": initial_state.get("background", ""),
+                "innovation": initial_state.get("innovation", ""),
+                "results": initial_state.get("results", ""),
+                "methodology": initial_state.get("methodology", ""),
+                "related_work": initial_state.get("related_work", ""),
+                "limitations": initial_state.get("limitations", ""),
+                "citations": initial_state.get("citations", ""),
+                "figures": initial_state.get("figures", ""),
+                "code": initial_state.get("code", ""),
+                "reproducibility": initial_state.get("reproducibility", ""),
+                "report": initial_state.get("report", ""),
+                "output_format": output_format,
+                "language": language,
+                "detail_level": detail_level,
+                "messages": []
+            }
+
+            print("\n" + "=" * 60)
+            print("论文分析完成！现在您可以提问。")
+            print("=" * 60)
+
+            while True:
+                user_input = input("\n您的问题 (输入 'exit' 退出): ").strip()
+
+                if user_input.lower() in ['exit', 'quit', 'q']:
+                    print("\n👋 感谢使用，再见！")
+                    break
+
+                if not user_input:
+                    continue
+
+                # Add user message
+                interactive_state["messages"].append(HumanMessage(content=user_input))
+
+                # Get answer
+                try:
+                    app = create_interactive_paper_agent_graph()
+                    result = app.invoke(interactive_state)
+                    interactive_state = result
+
+                    # Get the latest AI response
+                    if result.get("messages"):
+                        latest_message = result["messages"][-1]
+                        if hasattr(latest_message, 'content'):
+                            print(f"\n🤖 助手: {latest_message.content}")
+                except Exception as e:
+                    print(f"\n❌ 回答出错: {e}")
+
+            final_state = initial_state
+
+        elif adaptive:
+            # Adaptive analysis mode
+            final_state = run_adaptive_paper_analysis(
+                source,
+                output_format=output_format,
+                language=language,
+                detail_level=detail_level,
+                checkpoint_path=checkpoint_path,
+                max_iterations=max_iterations,
+                quality_threshold=quality_threshold,
+                enable_quality_check=True,
+                research_mode="auto" if not user_feedback else "manual"
+            )
+        else:
+            # Standard linear analysis mode
+            final_state = run_paper_analysis(
+                source,
+                output_format=output_format,
+                language=language,
+                detail_level=detail_level,
+                checkpoint_path=checkpoint_path
+            )
+
+        # If QA mode is enabled, run interactive Q&A (legacy mode)
+        if qa_mode and final_state.get("report") and not interactive:
             from paper_agent.qa_mode import interactive_qa_loop
             # Index the paper for Q&A
             from paper_agent.qa_mode import QAMode
@@ -209,6 +318,8 @@ def direct_mode(source: str, output_format: str = "markdown",
         print(f"📋 格式: {output_format}")
         print(f"🌐 语言: {language}")
         print(f"📊 详细程度: {detail_level}")
+        if adaptive:
+            print(f"🧠 模式: 自适应分析")
         print(f"\n📝 报告已生成")
 
     except Exception as e:
@@ -313,6 +424,41 @@ def parse_args():
         help='启用可复现性评估'
     )
 
+    # Phase 5: Adaptive analysis options
+    parser.add_argument(
+        '--adaptive', '-a',
+        action='store_true',
+        help='启用自适应分析模式（智能规划和质量评估）'
+    )
+
+    parser.add_argument(
+        '--interactive', '-i',
+        action='store_true',
+        help='启用交互式问答模式'
+    )
+
+    parser.add_argument(
+        '--max-iterations',
+        type=int,
+        default=3,
+        metavar='N',
+        help='最大迭代次数（默认: 3）'
+    )
+
+    parser.add_argument(
+        '--quality-threshold',
+        type=float,
+        default=0.75,
+        metavar='T',
+        help='质量阈值（0-1，默认: 0.75）'
+    )
+
+    parser.add_argument(
+        '--user-feedback',
+        action='store_true',
+        help='启用用户反馈模式'
+    )
+
     # Multi-paper comparison
     parser.add_argument(
         '--compare',
@@ -389,7 +535,12 @@ def main():
             analyze_figures=args.analyze_figures,
             extract_code=args.extract_code,
             assess_reproducibility=args.assess_reproducibility,
-            qa_mode=args.qa_mode
+            qa_mode=args.qa_mode,
+            adaptive=args.adaptive,
+            interactive=args.interactive,
+            max_iterations=args.max_iterations,
+            quality_threshold=args.quality_threshold,
+            user_feedback=args.user_feedback
         )
     else:
         interactive_mode()

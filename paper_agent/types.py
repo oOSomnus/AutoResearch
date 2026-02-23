@@ -2,7 +2,36 @@
 Types Module - Data structures for enhanced analysis.
 """
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
+
+
+@dataclass
+class AnalysisDecision:
+    """Analysis decision result from the planning phase."""
+    dimensions_to_analyze: List[str]
+    priority_order: List[str]
+    reason: str
+    confidence: float
+    suggested_detail_level: str = "standard"
+    suggested_additional_analyses: List[str] = None
+
+    def __post_init__(self):
+        if self.suggested_additional_analyses is None:
+            self.suggested_additional_analyses = []
+
+
+@dataclass
+class QualityAssessment:
+    """Quality assessment result for a dimension."""
+    dimension: str
+    score: float  # 0-1
+    completeness: float  # 0-1
+    depth: float  # 0-1
+    clarity: float  # 0-1
+    accuracy: float  # 0-1
+    issues: List[str]
+    needs_refinement: bool
+    suggestion: str
 
 
 @dataclass

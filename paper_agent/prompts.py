@@ -543,6 +543,144 @@ Comparison requirements:
 Please output the comparative analysis results directly, do not output any other content.
 """
 
+# Phase 5: Adaptive Analysis Prompts
+
+ANALYSIS_PLANNING_PROMPT_ZH = """你是一个论文分析规划专家。请根据以下论文信息，制定分析计划。
+
+论文标题：{title}
+论文类型：{paper_type}
+内容摘要：{content_preview}
+章节信息：{chapters_info}
+
+请分析并输出：
+1. 该论文需要分析哪些维度（从以下选择）：
+   - background（背景）
+   - innovation（创新）
+   - results（结果）
+   - methodology（方法）
+   - related_work（相关工作）
+   - limitations（局限性）
+   - citations（引用分析）
+   - figures（图表分析）
+   - code（代码提取）
+   - reproducibility（可复现性评估）
+
+2. 各维度的优先级顺序
+
+3. 选择理由（为什么这些维度重要）
+
+4. 需要特别注意的点
+
+5. 建议的详细程度（brief/standard/detailed）
+
+请以 JSON 格式输出，格式如下：
+{{
+    "dimensions": ["background", "innovation", "results", ...],
+    "priority": ["innovation", "background", "results"],
+    "reason": "这是一篇实验论文，核心创新在...",
+    "notes": ["注意验证实验设计", "重点关注结果对比"],
+    "suggested_detail_level": "standard"
+}}
+"""
+
+ANALYSIS_PLANNING_PROMPT_EN = """You are a paper analysis planning expert. Please create an analysis plan based on the following paper information.
+
+Paper Title: {title}
+Paper Type: {paper_type}
+Content Summary: {content_preview}
+Chapter Information: {chapters_info}
+
+Please analyze and output:
+1. Which dimensions need to be analyzed (choose from the following):
+   - background (Background)
+   - innovation (Innovation)
+   - results (Results)
+   - methodology (Methodology)
+   - related_work (Related Work)
+   - limitations (Limitations)
+   - citations (Citation Analysis)
+   - figures (Figure Analysis)
+   - code (Code Extraction)
+   - reproducibility (Reproducibility Assessment)
+
+2. Priority order of each dimension
+
+3. Selection reason (why these dimensions are important)
+
+4. Points that need special attention
+
+5. Suggested detail level (brief/standard/detailed)
+
+Please output in JSON format as follows:
+{{
+    "dimensions": ["background", "innovation", "results", ...],
+    "priority": ["innovation", "background", "results"],
+    "reason": "This is an experimental paper, the core innovation is in...",
+    "notes": ["Pay attention to experimental design", "Focus on result comparison"],
+    "suggested_detail_level": "standard"
+}}
+"""
+
+QUALITY_ASSESSMENT_PROMPT_ZH = """你是一个内容质量评估专家。请评估以下分析结果的质量。
+
+分析维度：{dimension}
+分析内容：{content}
+
+请评估：
+1. 内容完整性（0-1分）：是否覆盖了该维度应该包含的关键内容
+2. 深度（0-1分）：分析深度是否足够，是否触及核心问题
+3. 清晰度（0-1分）：语言表达是否清晰易懂
+4. 准确性（0-1分）：基于原文内容是否准确
+
+5. 具体问题（如有）
+6. 是否需要重新分析
+7. 改进建议
+
+请以 JSON 格式输出：
+{{
+    "completeness": 0.8,
+    "depth": 0.7,
+    "clarity": 0.9,
+    "accuracy": 0.85,
+    "overall_score": 0.81,
+    "issues": ["缺少具体数据", "部分概念未解释"],
+    "needs_refinement": true,
+    "suggestion": "需要补充实验数据的具体数值"
+}}
+
+如果 overall_score >= 0.75，将 needs_refinement 设为 false。
+"""
+
+QUALITY_ASSESSMENT_PROMPT_EN = """You are a content quality assessment expert. Please evaluate the quality of the following analysis result.
+
+Analysis Dimension: {dimension}
+Analysis Content: {content}
+
+Please evaluate:
+1. Completeness (0-1 score): Does it cover the key content that this dimension should include
+2. Depth (0-1 score): Is the analysis depth sufficient, does it touch on core issues
+3. Clarity (0-1 score): Is the language expression clear and easy to understand
+4. Accuracy (0-1 score): Is it accurate based on the original content
+
+5. Specific issues (if any)
+6. Whether re-analysis is needed
+7. Improvement suggestions
+
+Please output in JSON format:
+{{
+    "completeness": 0.8,
+    "depth": 0.7,
+    "clarity": 0.9,
+    "accuracy": 0.85,
+    "overall_score": 0.81,
+    "issues": ["Missing specific data", "Some concepts not explained"],
+    "needs_refinement": true,
+    "suggestion": "Need to supplement specific numerical values of experimental data"
+}}
+
+If overall_score >= 0.75, set needs_refinement to false.
+"""
+
 # Update PROMPTS dictionaries
 PROMPTS_ZH.update({
     "citations": CITATION_ANALYSIS_PROMPT_ZH,
@@ -550,6 +688,8 @@ PROMPTS_ZH.update({
     "code": CODE_ANALYSIS_PROMPT_ZH,
     "reproducibility": REPRODUCIBILITY_ASSESSMENT_PROMPT_ZH,
     "comparison": COMPARISON_PROMPT_ZH,
+    "analysis_planning": ANALYSIS_PLANNING_PROMPT_ZH,
+    "quality_assessment": QUALITY_ASSESSMENT_PROMPT_ZH,
 })
 
 PROMPTS_EN.update({
@@ -558,6 +698,8 @@ PROMPTS_EN.update({
     "code": CODE_ANALYSIS_PROMPT_EN,
     "reproducibility": REPRODUCIBILITY_ASSESSMENT_PROMPT_EN,
     "comparison": COMPARISON_PROMPT_EN,
+    "analysis_planning": ANALYSIS_PLANNING_PROMPT_EN,
+    "quality_assessment": QUALITY_ASSESSMENT_PROMPT_EN,
 })
 
 # New getter functions for extraction prompts
@@ -589,6 +731,36 @@ def get_comparison_prompt(paper_descriptions: str, language: str = "zh") -> str:
     """Get the comparison prompt with paper descriptions filled in."""
     prompt = get_prompt_template("comparison", language)
     return prompt.format(paper_descriptions=paper_descriptions)
+
+
+def get_analysis_planning_prompt(
+    title: str,
+    paper_type: str,
+    content_preview: str,
+    chapters_info: str = "",
+    language: str = "zh"
+) -> str:
+    """Get the analysis planning prompt with content filled in."""
+    prompt = get_prompt_template("analysis_planning", language)
+    return prompt.format(
+        title=title or "未知" if language == "zh" else "Unknown",
+        paper_type=paper_type or "unknown",
+        content_preview=content_preview,
+        chapters_info=chapters_info
+    )
+
+
+def get_quality_assessment_prompt(
+    dimension: str,
+    content: str,
+    language: str = "zh"
+) -> str:
+    """Get the quality assessment prompt with content filled in."""
+    prompt = get_prompt_template("quality_assessment", language)
+    return prompt.format(
+        dimension=dimension,
+        content=content
+    )
 
 
 # Legacy prompts for backward compatibility

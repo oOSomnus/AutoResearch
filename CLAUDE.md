@@ -27,6 +27,8 @@ AutoResearch is a LangGraph-based intelligent paper reading agent that analyzes 
 - Interactive Q&A: RAG-based paper questioning
 - Content extraction: citation analysis, figure analysis, code extraction, reproducibility assessment
 - Cache optimization: result caching for faster repeat analysis
+- **Intelligent adaptive analysis**: Dynamic analysis planning, automatic quality assessment and refinement
+- **Interactive conversation mode**: Multi-turn dialogue with paper assistant
 
 ## Setup
 
@@ -93,15 +95,26 @@ python main.py --resume checkpoint.json
 # Clear cache
 python main.py --clear-cache
 
+# Adaptive analysis mode (intelligent planning + quality assessment)
+python main.py --adaptive ./paper.pdf
+python main.py --adaptive --max-iterations 5 --quality-threshold 0.8 ./paper.pdf
+
+# Interactive Q&A mode (converse with paper assistant)
+python main.py --interactive ./paper.pdf
+
+# Combined adaptive + interactive mode
+python main.py --adaptive --interactive ./paper.pdf
+
 # Run graph directly (for testing)
 python -m paper_agent.graph <pdf_path_or_url>
 ```
 
 ## Architecture
 
-The project uses **LangGraph** to orchestrate a conditional branching workflow through multiple nodes:
+The project uses **LangGraph** to orchestrate conditional branching workflows through multiple nodes.
 
-**Core Workflow Nodes**:
+### Core Workflow Nodes
+
 1. **fetch_pdf** - Downloads PDF from URL or validates local file, extracts title
 2. **extract_content** - Extracts text from PDF and chapters
 3. **detect_paper_type** - Detects paper type (survey/experimental/theoretical)
@@ -120,18 +133,40 @@ The project uses **LangGraph** to orchestrate a conditional branching workflow t
 - **extract_code** - Extract code snippets and algorithms
 - **assess_reproducibility** - Assess paper reproducibility
 
+**Adaptive Analysis Nodes** (Phase 5):
+- **plan_analysis** - Intelligently plans which dimensions to analyze based on paper content
+- **assess_quality** - Evaluates analysis quality (completeness, depth, clarity, accuracy)
+- **gather_user_feedback** - Collects user feedback on key decisions (interactive mode)
+
 ### Workflow Paths
 
+**Standard Mode**:
 - **Survey papers**: background → related_work → innovation → results
 - **Experimental papers**: background → innovation → methodology → results
 - **Theoretical/Unknown papers**: background → innovation → limitations → results
 
+**Adaptive Mode** (`--adaptive` flag):
+1. fetch_pdf → extract_content → detect_paper_type → **plan_analysis**
+2. Dynamic routing based on analysis plan (dimensions executed in priority order)
+3. After each analysis: **assess_quality**
+4. If quality below threshold: return to analysis node for refinement (max N iterations)
+5. Once all dimensions complete: generate_report → save_report
+
+**Interactive Q&A Mode** (`--interactive` flag):
+1. Run adaptive analysis (run_initial_analysis)
+2. Enter conversation loop with user
+3. answer_question responds to user queries
+4. User can exit with "exit", "quit", etc.
+
 ### Module Structure
 
 **Core Layer**:
-- **`paper_agent/graph.py`** - Defines the StateGraph workflow with conditional routing based on paper type
-- **`paper_agent/nodes.py`** - Contains all node functions with checkpoint and cache integration
-- **`paper_agent/prompts.py`** - Bilingual prompt templates (Chinese/English) for each analysis phase
+- **`paper_agent/graph.py`** - Defines three workflow modes:
+  - `create_paper_agent_graph()` - Standard linear workflow (backward compatible)
+  - `create_adaptive_paper_agent_graph()` - Adaptive workflow with quality assessment
+  - `create_interactive_paper_agent_graph()` - Interactive Q&A workflow
+- **`paper_agent/nodes.py`** - Contains all node functions including adaptive decision nodes
+- **`paper_agent/prompts.py`** - Bilingual prompt templates including planning and quality assessment
 
 **Processing Layer**:
 - **`paper_agent/pdf_reader.py`** - PDF extraction utilities using PyPDF2, plus URL download
@@ -152,9 +187,9 @@ The project uses **LangGraph** to orchestrate a conditional branching workflow t
 - **`paper_agent/checkpoint.py`** - Checkpoint management for resumable analysis
 - **`paper_agent/progress.py`** - Progress tracking with tqdm
 - **`paper_agent/history.py`** - SQLite-based analysis history management
-- **`paper_agent/batch.py` - Batch processing coordinator
-- **`paper_agent/qa_mode.py` - Interactive RAG-based Q&A mode
-- **`paper_agent/ui.py` - Rich terminal UI with fallback support
+- **`paper_agent/batch.py`** - Batch processing coordinator
+- **`paper_agent/qa_mode.py`** - Interactive RAG-based Q&A mode
+- **`paper_agent/ui.py`** - Rich terminal UI with fallback support
 
 **Analysis Layer**:
 - **`paper_agent/extractors/`** - Content extractors
@@ -165,11 +200,21 @@ The project uses **LangGraph** to orchestrate a conditional branching workflow t
 - **`paper_agent/comparison.py`** - Multi-paper comparison
 - **`paper_agent/research_assistant.py`** - Research assistant mode
 
+**Testing Layer**:
+- **`test/`** - Test suite
+  - `test_adaptive_graph.py` - Tests for adaptive graph functionality
+  - `test_quality_assessment.py` - Tests for quality assessment
+  - `test_interactive_mode.py` - Tests for interactive Q&A mode
+
 **Support Layer**:
 - **`paper_agent/config.py`** - Configuration management
-- **`paper_agent/types.py`** - Data structure definitions
+- **`paper_agent/types.py`** - Data structure definitions including:
+  - `AnalysisDecision` - Analysis planning result from LLM (Phase 5)
+  - `QualityAssessment` - Quality evaluation result (Phase 5)
+  - `FigureInfo`, `TableInfo`, `CodeSnippet`, `CitationInfo` - Extraction types
+  - `ReproducibilityAssessment`, `ComparisonResult` - Additional analysis types
 - **`paper_agent/cache/`** - Caching utilities (LRU cache, disk cache)
-- **`paper_agent/retry.py` - Exponential backoff retry logic
+- **`paper_agent/retry.py`** - Exponential backoff retry logic
 
 ### AgentState
 
@@ -210,6 +255,18 @@ The TypedDict passed between nodes contains:
 - `checkpoint_path` - Path to checkpoint file
 - `cache_key` - Cache key for the analysis
 
+**Adaptive Analysis Fields** (Phase 5):
+- `analysis_plan` - Dict containing analysis plan (dimensions, priority, reasoning)
+- `quality_scores` - Dict mapping dimensions to their quality metrics
+- `iteration_count` - Dict tracking how many iterations each dimension has had
+- `needs_refinement` - List of dimensions that need re-analysis
+- `should_exit` - Boolean flag for early termination
+- `research_mode` - Current mode: 'auto', 'interactive', 'manual'
+- `current_dimension` - Currently analyzed dimension
+- `dimension_to_assess` - Dimension to assess for quality
+- `max_iterations` - Maximum refinement iterations per dimension (default: 3)
+- `quality_threshold` - Minimum quality score to accept (default: 0.75)
+
 ## Development Notes
 
 ### Workflow Design
@@ -217,6 +274,7 @@ The TypedDict passed between nodes contains:
 - The project uses LangGraph conditional branching based on paper type
 - Workflows adapt dynamically: survey, experimental, and theoretical papers take different analysis paths
 - All nodes support checkpoint saving and cache checking for resumability
+- Adaptive mode adds intelligent planning and quality assessment loops
 
 ### Content Processing
 
@@ -229,6 +287,7 @@ The TypedDict passed between nodes contains:
 - All prompts are designed for simple, conversational output accessible to high school graduates
 - Bilingual prompts are available for both Chinese and English
 - Detail level modifiers control output verbosity
+- Phase 5 added prompts for analysis planning and quality assessment
 
 ### Output Formats
 
@@ -242,6 +301,7 @@ The TypedDict passed between nodes contains:
 - Nodes include fallback mechanisms when LLM fails
 - Optional dependencies gracefully degrade to simple functionality
 - Cache and checkpoint systems help with recovery and debugging
+- Quality assessment failures gracefully default to accepting the result
 
 ### Extensibility
 
@@ -249,7 +309,7 @@ The TypedDict passed between nodes contains:
 1. Add node function in `paper_agent/nodes.py`
 2. Update `AgentState` in `paper_agent/nodes.py` if needed
 3. Add routing function in `paper_agent/graph.py`
-4. Add node to workflow in `create_paper_agent_graph()`
+4. Add node to workflow in `create_paper_agent_graph()` or `create_adaptive_paper_agent_graph()`
 5. Add prompt template in `paper_agent/prompts.py`
 
 **Adding a new output format**:
@@ -264,12 +324,19 @@ The TypedDict passed between nodes contains:
 3. Add prompt template in `paper_agent/prompts.py`
 4. Add CLI flag in main.py
 
+**Adding a new adaptive analysis dimension**:
+1. Ensure the dimension is in `plan_analysis` prompts
+2. Add mapping in `route_after_planning` if needed
+3. Add corresponding analysis node
+4. Add quality assessment support if applicable
+
 ### Documentation Updates
 
 **IMPORTANT**: After any code changes, you MUST also update the relevant documentation files:
 
 1. **README.md** - Update usage examples, feature descriptions, and installation instructions if affected
 2. **docs/** - Update any related documentation files in the docs directory (API docs, architecture docs, user guides, etc.)
+3. **CLAUDE.md** - Update this file with new architecture decisions, workflow changes, and development guidelines
 
 This ensures that documentation stays synchronized with the codebase and users have accurate, up-to-date information.
 
@@ -280,6 +347,8 @@ This ensures that documentation stays synchronized with the codebase and users h
 3. **Parallel Execution**: Independent analysis nodes can be parallelized in future
 4. **Bilingual Support**: Language switching mode (--language parameter) for single-language output
 5. **Default Cache**: Results are cached by default for improved performance
+6. **Adaptive Analysis**: Quality assessment adds extra LLM calls but improves result quality
+7. **Backward Compatibility**: Standard mode remains as default for existing users
 
 ## Dependencies
 
@@ -300,3 +369,7 @@ This ensures that documentation stays synchronized with the codebase and users h
 - click>=8.1.0 - CLI framework
 - tiktoken>=0.5.0 - Token counting
 - diskcache>=5.6.0 - Persistent caching
+
+**Testing Dependencies**:
+- pytest>=7.0.0 - Test framework
+- pytest-cov>=4.0.0 - Test coverage reporting
