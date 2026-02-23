@@ -209,7 +209,7 @@ The project uses **LangGraph** to orchestrate conditional branching workflows th
 
 **Output Layer**:
 - **`paper_agent/formatters/`** - Report output formatters
-  - `base_formatter.py` - Abstract base class
+  - `base_formatter.py` - Abstract base class with markdown list normalization
   - `markdown_formatter.py` - Markdown output (default)
   - `html_formatter.py` - HTML output with MathJax support
   - `pdf_formatter.py` - PDF output via weasyprint
@@ -342,6 +342,12 @@ The TypedDict passed between nodes contains:
   - Results analysis: requires specific quantitative data and table/figure references
   - Figure/table context is injected separately for better utilization
   - Report formatter now includes dedicated "Figures & Tables" section
+- **Four-tier progressive analysis structure** (all analysis dimensions):
+  - **Tier 1: 通俗理解/ Layman Understanding** - Simple explanation with everyday metaphors, accessible to non-experts
+  - **Tier 2: 关键机制/Key Mechanisms** - Technical overview explaining core principles
+  - **Tier 3: 具体实现/Specific Implementation** - Detailed technical steps, parameters, formulas, and code
+  - **Tier 4: 深层洞察/Deep Insights** - Research significance with external real-world examples and future directions
+- Each prompt requires 1-2 external real-world examples (not just from the paper) to illustrate concepts and applications
 
 ### Output Formats
 
@@ -406,6 +412,8 @@ This ensures that documentation stays synchronized with the codebase and users h
 8. **Multi-Stage Title Extraction**: LLM-first approach with heuristics as fallback for maximum accuracy
 9. **Balanced Response Style**: Prompts require both accessibility and technical depth for better utility
 10. **Figure Context Injection**: Automatic figure/table detection and annotation improves analysis quality
+11. **Four-Tier Progressive Analysis**: Analysis prompts use a four-tier structure (Layman → Key Mechanisms → Specific Implementation → Deep Insights) with external examples for comprehensive understanding
+12. **Markdown List Normalization**: Formatters automatically normalize list indentation to proper markdown standard (2+ spaces per nesting level) for correct rendering
 
 ## Dependencies
 

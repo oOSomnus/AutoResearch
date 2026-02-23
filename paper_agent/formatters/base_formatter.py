@@ -73,4 +73,64 @@ class BaseFormatter(ABC):
         import re
         content = re.sub(r'\n{3,}', '\n\n', content)
         content = re.sub(r' +', ' ', content)
+        # Normalize markdown list indentation
+        content = self._normalize_markdown_lists(content)
         return content.strip()
+
+    def _normalize_markdown_lists(self, content: str) -> str:
+        """
+        Normalize markdown list indentation to proper standard (2+ spaces per nesting level).
+        This fixes issues where nested list items don't have sufficient indentation.
+        """
+        import re
+
+        lines = content.split('\n')
+        result_lines = []
+
+        # Pattern for list items: optional leading spaces + bullet/number marker
+        list_pattern = re.compile(r'^(\s*)([-*+]|\d+[.)])\s+(.*)$')
+
+        # Track the actual indentation levels we've seen, in order
+        # Each entry is the indentation value that represents a nesting level
+        indent_levels = []  # Stack of actual indentation values from input
+
+        for line in lines:
+            match = list_pattern.match(line)
+
+            if match:
+                # This is a list item
+                indent_str = match.group(1)
+                list_marker = match.group(2)
+                item_content = match.group(3)
+
+                current_indent = len(indent_str)
+
+                # Determine where this item fits in the nesting hierarchy
+                # Pop from stack until we find a level that is strictly less than current
+                while indent_levels and current_indent <= indent_levels[-1]:
+                    indent_levels.pop()
+
+                # Now check if this is a new nesting level
+                if not indent_levels or current_indent > indent_levels[-1]:
+                    # This is a new, deeper nesting level
+                    indent_levels.append(current_indent)
+
+                # Nesting level is the size of the stack
+                nesting_level = len(indent_levels) - 1  # 0-indexed
+
+                # Proper indentation: 0 spaces for level 0, 2 for level 1, 4 for level 2, etc.
+                proper_indent = 2 * nesting_level
+
+                # Rebuild line with correct indentation
+                line = ' ' * proper_indent + list_marker + ' ' + item_content
+
+            else:
+                # Non-list line
+                stripped = line.strip()
+                # Reset stack for blank lines or headers
+                if not stripped or stripped.startswith('#'):
+                    indent_levels = []
+
+            result_lines.append(line)
+
+        return '\n'.join(result_lines)
