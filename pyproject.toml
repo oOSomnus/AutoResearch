@@ -78,7 +78,8 @@ dev = [
 ]
 
 [project.scripts]
-autoresearch = "paper_agent.__main__:main"
+autoresearch = "main:main"
+paper-agent = "main:main"
 
 [project.urls]
 Homepage = "https://github.com/oOSomnus/AutoResearch"
