@@ -208,14 +208,23 @@ def analyze_background(state: AgentState) -> AgentState:
 
     try:
         llm = get_llm()
+        language = state.get("language", "zh")
 
-        # Use chapter-based content if available
+        # Use improved chapter-based content if available
+        figures_context = ""
         if chapters:
-            relevant_content = get_relevant_content_for_analysis(chapters, 'background')
+            from .chunking import get_relevant_content_for_analysis
+            relevant_content, figures = get_relevant_content_for_analysis(chapters, 'background')
             if relevant_content:
                 content = relevant_content
+                # Build figures context
+                if figures:
+                    figures_context = "\n\n**图表信息：**\n" + "\n".join([
+                        f"- {f.identifier}: {f.caption[:200]}"
+                        for f in figures[:5]
+                    ])
 
-        prompt = get_background_prompt(content)
+        prompt = get_background_prompt(content, language=language, figures_context=figures_context)
         response = llm.invoke(prompt)
         background = response.content.strip()
 
@@ -231,14 +240,32 @@ def analyze_background(state: AgentState) -> AgentState:
 def analyze_innovation(state: AgentState) -> AgentState:
     """
     Node 4: Analyze the innovation and core theory of the research.
+    Uses improved content selection with figure/table context.
     """
-    content = state["content"]
+    chapters = state.get("chapters", [])
+    content = state.get("content", "")
 
     print("💡 正在分析创新&核心理论...")
 
     try:
         llm = get_llm()
-        prompt = get_innovation_prompt(content)
+        language = state.get("language", "zh")
+
+        # Use improved chapter-based content if available
+        figures_context = ""
+        if chapters:
+            from .chunking import get_relevant_content_for_analysis
+            relevant_content, figures = get_relevant_content_for_analysis(chapters, 'innovation')
+            if relevant_content:
+                content = relevant_content
+                # Build figures context
+                if figures:
+                    figures_context = "\n\n**图表信息：**\n" + "\n".join([
+                        f"- {f.identifier}: {f.caption[:200]}"
+                        for f in figures[:10]
+                    ])
+
+        prompt = get_innovation_prompt(content, language=language, figures_context=figures_context)
         response = llm.invoke(prompt)
         innovation = response.content.strip()
 
@@ -254,7 +281,7 @@ def analyze_innovation(state: AgentState) -> AgentState:
 def analyze_results(state: AgentState) -> AgentState:
     """
     Node 6: Analyze the results and conclusions of the research.
-    Uses chapter-based content for more focused analysis.
+    Uses improved chapter-based content with figure/table context.
     """
     chapters = state.get("chapters", [])
     content = state.get("content", "")
@@ -263,14 +290,23 @@ def analyze_results(state: AgentState) -> AgentState:
 
     try:
         llm = get_llm()
+        language = state.get("language", "zh")
 
-        # Use chapter-based content if available
+        # Use improved chapter-based content if available
+        figures_context = ""
         if chapters:
-            relevant_content = get_relevant_content_for_analysis(chapters, 'results')
+            from .chunking import get_relevant_content_for_analysis
+            relevant_content, figures = get_relevant_content_for_analysis(chapters, 'results')
             if relevant_content:
                 content = relevant_content
+                # Build figures context (important for results)
+                if figures:
+                    figures_context = "\n\n**图表信息：**\n" + "\n".join([
+                        f"- {f.identifier}: {f.caption[:200]}"
+                        for f in figures[:10]
+                    ])
 
-        prompt = get_results_prompt(content)
+        prompt = get_results_prompt(content, language=language, figures_context=figures_context)
         response = llm.invoke(prompt)
         results = response.content.strip()
 

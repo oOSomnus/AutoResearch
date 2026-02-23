@@ -5,6 +5,70 @@ Supports both Chinese (zh) and English (en) languages.
 
 # Chinese Prompts (Default)
 
+# Title extraction prompt (new)
+TITLE_EXTRACTION_PROMPT_ZH = """你是一个擅长识别论文标题的助手。请从以下论文第一页内容中提取论文标题。
+
+内容（前3000字）：
+{first_page_content}
+
+要求：
+1. 仔细识别标题，标题通常在页面的顶部中央或左侧
+2. 标题会比其他文字更醒目（虽然无法看到格式，但可以通过位置判断）
+3. 排除作者姓名、单位、"Abstract"、"Introduction"等非标题内容
+4. 如果多行看起来是标题，提取完整的标题
+5. 如果无法确定，返回空字符串
+
+只输出标题文本，不要输出任何其他内容。
+"""
+
+TITLE_EXTRACTION_PROMPT_EN = """Extract the paper title from the following first page content.
+
+Content (first 3000 chars):
+{first_page_content}
+
+Requirements:
+1. Carefully identify the title, which is typically at the top center or left of the page
+2. The title is usually more prominent (though we can't see formatting, use position as a clue)
+3. Exclude author names, affiliations, "Abstract", "Introduction", and other non-title content
+4. If multiple lines appear to be the title, extract the complete title
+5. If you cannot determine the title, return an empty string
+
+Output ONLY the title text, nothing else.
+"""
+
+# Content with figures prompt (new)
+CONTENT_WITH_FIGURES_PROMPT_ZH = """你是一个论文分析助手。请基于以下论文内容和图表信息进行分析。
+
+论文内容：
+{content}
+
+图表信息：
+{figures_info}
+
+要求：
+1. 在分析中引用相关的图表（例如："如图1所示"、"表2中的数据显示..."）
+2. 说明图表的关键信息对结论的支持作用
+3. 如果公式存在，用自然语言解释公式的含义
+4. 如果需要，可以引用图表中的具体数值或趋势
+"""
+
+CONTENT_WITH_FIGURES_PROMPT_EN = """You are a paper analysis assistant. Please analyze based on the following paper content and figure/table information.
+
+Paper content:
+{content}
+
+Figure/table information:
+{figures_info}
+
+Requirements:
+1. Reference relevant figures/tables in your analysis (e.g., "As shown in Figure 1", "The data in Table 2 shows...")
+2. Explain how key information from figures supports the conclusions
+3. If formulas exist, explain their meaning in natural language
+4. If needed, reference specific values or trends from figures
+"""
+
+# Chinese Prompts (Default)
+
 BACKGROUND_ANALYSIS_PROMPT_ZH = """你是一个擅长用简单易懂的语言解释学术研究的助手。请仔细阅读下面的论文内容，然后回答：**为什么做这个研究？背景是什么？**
 
 论文内容：
@@ -15,8 +79,9 @@ BACKGROUND_ANALYSIS_PROMPT_ZH = """你是一个擅长用简单易懂的语言解
 2. 避免使用过于专业的术语，如果必须使用，要给出简单的解释
 3. 突出研究者面临的"问题"或"痛点"
 4. 说明为什么这个问题值得研究
-5. 用1-3段话总结，不要太长
-6. 如果内容信息不足，如实说明
+5. **具体说明**：提及论文中提到的具体问题陈述、数据或统计信息（如果存在）
+6. 用1-3段话总结，不要太长
+7. 如果内容信息不足，如实说明
 
 请直接输出分析结果，不要输出任何其他内容。
 """
@@ -25,20 +90,22 @@ INNOVATION_ANALYSIS_PROMPT_ZH = """你是一个擅长用简单易懂的语言解
 
 论文内容：
 {content}
+{figures_context}
 
 要求：
-1. 用非常简单、口语化的语言解释，就像给高中毕业生讲解一样
-2. 避免使用过于专业的术语，如果必须使用，要给出简单的解释或举例子
-3. 用简单的比喻或类比来帮助理解核心思想（如果适用）
+1. **首先用简单、口语化的语言介绍核心思想**（1-2段），就像给高中毕业生讲解一样
+2. **然后详细展开具体实现**：
+   - 逐步说明算法或方法的实现步骤
+   - 描述模型架构的关键组件
+   - 说明训练策略或数据集设计
+3. 使用简单的比喻或类比来帮助理解核心思想（如果适用）
 4. 说明这个方法和已有方法的主要区别
-5. **详细展开**：这部分需要比背景和结果更详细，可以分成多个小节来说明
+5. **引用具体细节**：
+   - 如果有公式，用自然语言解释公式的含义
+   - 如果有图表，在分析中引用（例如："如图1所示"、"表2中的数据显示..."）
+   - 提及关键参数、设计选择或技术细节
 6. 用列表或分段的方式组织内容，便于阅读
-7. 涵盖以下方面（如果论文中有）：
-   - 核心算法/方法的原理（用通俗语言）
-   - 模型架构的关键组件
-   - 训练策略或数据集设计
-   - 与现有方法的对比优势
-8. 如果内容信息不足，如实说明
+7. 如果内容信息不足，如实说明
 
 请直接输出分析结果，不要输出任何其他内容。
 """
@@ -47,14 +114,19 @@ RESULTS_ANALYSIS_PROMPT_ZH = """你是一个擅长用简单易懂的语言总结
 
 论文内容：
 {content}
+{figures_context}
 
 要求：
 1. 用非常简单、口语化的语言总结，就像给高中毕业生讲解一样
 2. 清晰地说明主要发现和结论
-3. 避免列出大量数字，用定性的方式描述趋势和结果
-4. 说明这些结果有什么实际意义或价值
-5. 用1-3段话总结，不要太长
-6. 如果内容信息不足，如实说明
+3. **包含具体定量数据**：
+   - 提及关键性能指标（准确率、F1分数、召回率等）
+   - 引用对比数据（比基线方法提升X%）
+   - 引用具体数字（例如："在X数据集上达到Y%的准确率"）
+4. **引用图表**：在结果中引用相关的表或图（例如："如表1所示"、"图2展示了..."）
+5. 说明这些结果有什么实际意义或价值
+6. 用1-3段话总结，不要太长
+7. 如果内容信息不足，如实说明
 
 请直接输出分析结果，不要输出任何其他内容。
 """
@@ -190,8 +262,9 @@ Requirements:
 2. Avoid overly technical terminology; if necessary, provide simple explanations
 3. Highlight the "problem" or "pain point" the researchers are facing
 4. Explain why this problem is worth studying
-5. Summarize in 1-3 paragraphs, don't be too long
-6. If content information is insufficient, state so honestly
+5. **Be specific**: Mention specific problem statements, data, or statistics from the paper (if present)
+6. Summarize in 1-3 paragraphs, don't be too long
+7. If content information is insufficient, state so honestly
 
 Please output the analysis results directly, do not output any other content.
 """
@@ -200,20 +273,22 @@ INNOVATION_ANALYSIS_PROMPT_EN = """You are an assistant who specializes in expla
 
 Paper content:
 {content}
+{figures_context}
 
 Requirements:
-1. Use very simple, conversational language, like explaining to a high school graduate
-2. Avoid overly technical terminology; if necessary, provide simple explanations or examples
+1. **First, introduce the core idea in simple, conversational language** (1-2 paragraphs), like explaining to a high school graduate
+2. **Then detail the specific implementation**:
+   - Explain the algorithm or method step-by-step
+   - Describe key components of the model architecture
+   - Explain training strategy or dataset design
 3. Use simple metaphors or analogies to help understand the core idea (if applicable)
 4. Explain the main differences between this method and existing methods
-5. **Expand in detail**: This section should be more detailed than background and results, can be divided into multiple subsections
+5. **Reference specific details**:
+   - If formulas exist, explain their meaning in natural language
+   - If figures exist, reference them in your analysis (e.g., "As shown in Figure 1", "The data in Table 2 shows...")
+   - Mention key parameters, design choices, or technical details
 6. Organize content with lists or paragraphs for easy reading
-7. Cover the following aspects (if present in the paper):
-   - Core algorithm/method principle (in plain language)
-   - Key components of the model architecture
-   - Training strategy or dataset design
-   - Comparative advantages with existing methods
-8. If content information is insufficient, state so honestly
+7. If content information is insufficient, state so honestly
 
 Please output the analysis results directly, do not output any other content.
 """
@@ -222,14 +297,19 @@ RESULTS_ANALYSIS_PROMPT_EN = """You are an assistant who specializes in summariz
 
 Paper content:
 {content}
+{figures_context}
 
 Requirements:
 1. Summarize using very simple, conversational language, like explaining to a high school graduate
 2. Clearly state the main findings and conclusions
-3. Avoid listing many numbers; describe trends and results qualitatively
-4. Explain the practical significance or value of these results
-5. Summarize in 1-3 paragraphs, don't be too long
-6. If content information is insufficient, state so honestly
+3. **Include specific quantitative data**:
+   - Mention key performance metrics (accuracy, F1 score, recall, etc.)
+   - Reference comparison data (X% improvement over baseline)
+   - Reference specific numbers (e.g., "achieved Y% accuracy on X dataset")
+4. **Reference figures and tables**: Reference relevant tables or figures in your results (e.g., "As shown in Table 1", "Figure 2 shows...")
+5. Explain the practical significance or value of these results
+6. Summarize in 1-3 paragraphs, don't be too long
+7. If content information is insufficient, state so honestly
 
 Please output the analysis results directly, do not output any other content.
 """
@@ -809,25 +889,25 @@ def apply_detail_level(prompt: str, detail_level: str) -> str:
     return prompt
 
 
-def get_background_prompt(content: str, language: str = "zh", detail_level: str = "standard") -> str:
+def get_background_prompt(content: str, language: str = "zh", detail_level: str = "standard", figures_context: str = "") -> str:
     """Get the background analysis prompt with content filled in."""
     prompt = get_prompt_template("background", language)
     prompt = apply_detail_level(prompt, detail_level)
-    return prompt.format(content=content)
+    return prompt.format(content=content, figures_context=figures_context)
 
 
-def get_innovation_prompt(content: str, language: str = "zh", detail_level: str = "standard") -> str:
+def get_innovation_prompt(content: str, language: str = "zh", detail_level: str = "standard", figures_context: str = "") -> str:
     """Get the innovation analysis prompt with content filled in."""
     prompt = get_prompt_template("innovation", language)
     prompt = apply_detail_level(prompt, detail_level)
-    return prompt.format(content=content)
+    return prompt.format(content=content, figures_context=figures_context)
 
 
-def get_results_prompt(content: str, language: str = "zh", detail_level: str = "standard") -> str:
+def get_results_prompt(content: str, language: str = "zh", detail_level: str = "standard", figures_context: str = "") -> str:
     """Get the results analysis prompt with content filled in."""
     prompt = get_prompt_template("results", language)
     prompt = apply_detail_level(prompt, detail_level)
-    return prompt.format(content=content)
+    return prompt.format(content=content, figures_context=figures_context)
 
 
 def get_paper_type_detection_prompt(title: str, content: str, language: str = "zh") -> str:

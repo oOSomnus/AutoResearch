@@ -29,6 +29,7 @@ AutoResearch is a LangGraph-based intelligent paper reading agent that analyzes 
 - Cache optimization: result caching for faster repeat analysis
 - **Intelligent adaptive analysis**: Dynamic analysis planning, automatic quality assessment and refinement
 - **Interactive conversation mode**: Multi-turn dialogue with paper assistant
+- **Smart content extraction**: LLM-driven title extraction, intelligent chapter detection, automatic figure/table annotation
 
 ## Setup
 
@@ -320,6 +321,13 @@ The TypedDict passed between nodes contains:
 - Uses chapter-based extraction to handle long papers (no 30k character limit)
 - Content selection is optimized per analysis type for better accuracy
 - PDF hash is calculated for cache key generation
+- **Smart content extraction (Phase 6)**:
+  - LLM-driven title extraction with multi-stage fallback (LLM → metadata → heuristics)
+  - Improved chapter detection with reduced false positives (225+ → ~11 valid chapters)
+  - Intelligent content selection: exact match → partial match → semantic proximity
+  - Smart truncation: preserves beginning (70%) and end (30%) when exceeding token limits
+  - Automatic figure/table detection and annotation for context passing
+  - Expanded keyword lists per analysis type for better matching
 
 ### Prompts
 
@@ -327,6 +335,13 @@ The TypedDict passed between nodes contains:
 - Bilingual prompts are available for both Chinese and English
 - Detail level modifiers control output verbosity
 - Phase 5 added prompts for analysis planning and quality assessment
+- **Phase 6: Balanced response style improvements**:
+  - Prompts now require both simple language AND specific technical details
+  - Background analysis: requires specific problem statements and data/statistics
+  - Innovation analysis: simple introduction + detailed implementation steps, requires figure/formula references
+  - Results analysis: requires specific quantitative data and table/figure references
+  - Figure/table context is injected separately for better utilization
+  - Report formatter now includes dedicated "Figures & Tables" section
 
 ### Output Formats
 
@@ -388,6 +403,9 @@ This ensures that documentation stays synchronized with the codebase and users h
 5. **Default Cache**: Results are cached by default for improved performance
 6. **Adaptive Analysis**: Quality assessment adds extra LLM calls but improves result quality
 7. **Backward Compatibility**: Standard mode remains as default for existing users
+8. **Multi-Stage Title Extraction**: LLM-first approach with heuristics as fallback for maximum accuracy
+9. **Balanced Response Style**: Prompts require both accessibility and technical depth for better utility
+10. **Figure Context Injection**: Automatic figure/table detection and annotation improves analysis quality
 
 ## Dependencies
 

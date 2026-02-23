@@ -1,7 +1,7 @@
 """
 Markdown Formatter - Generate Markdown reports from analysis results.
 """
-from typing import Dict, Any
+from typing import Dict, Any, List
 
 from .base_formatter import BaseFormatter
 
@@ -37,6 +37,17 @@ class MarkdownFormatter(BaseFormatter):
         code = self._clean_content(self._get_field(state, "code", ""))
         reproducibility = self._clean_content(self._get_field(state, "reproducibility", ""))
 
+        # Get structured figures list if available
+        figures_list = state.get("figures_list", [])
+        tables_list = state.get("tables_list", [])
+
+        # Build figures & tables section
+        figures_tables_section = ""
+        if figures_list or tables_list:
+            figures_tables_section = self._format_figures_and_tables(figures_list, tables_list)
+        elif figures:
+            figures_tables_section = f"\n## 图表&表格\n{figures}\n"
+
         # Build report sections
         sections = []
         sections.append(f"# 论文分析报告\n")
@@ -64,13 +75,14 @@ class MarkdownFormatter(BaseFormatter):
             sections.append(f"\n## {section_number}、局限性\n{limitations}\n")
             section_number += 1
 
+        # Add figures & tables section (dedicated section for better organization)
+        if figures_tables_section:
+            sections.append(f"\n## {section_number}、图表&表格\n{figures_tables_section}\n")
+            section_number += 1
+
         # New extraction sections (if enabled)
         if citations:
             sections.append(f"\n## {section_number}、引用分析\n{citations}\n")
-            section_number += 1
-
-        if figures:
-            sections.append(f"\n## {section_number}、图表分析\n{figures}\n")
             section_number += 1
 
         if code:
@@ -81,3 +93,34 @@ class MarkdownFormatter(BaseFormatter):
             sections.append(f"\n## {section_number}、可复现性评估\n{reproducibility}\n")
 
         return "\n".join(sections)
+
+    def _format_figures_and_tables(self, figures_list: List, tables_list: List) -> str:
+        """
+        Format figures and tables into a dedicated section.
+
+        Args:
+            figures_list: List of figure info objects
+            tables_list: List of table info objects
+
+        Returns:
+            Formatted figures & tables section as string
+        """
+        parts = []
+
+        # Format figures
+        if figures_list:
+            parts.append("\n### 图表摘要\n")
+            for fig in figures_list[:10]:  # Limit to first 10 figures
+                parts.append(f"- **{fig.get('identifier', 'Figure')}**: {fig.get('caption', fig.get('description', ''))[:200]}")
+
+        # Format tables
+        if tables_list:
+            parts.append("\n### 表格摘要\n")
+            for table in tables_list[:10]:  # Limit to first 10 tables
+                caption = table.get('caption', table.get('content', ''))[:200]
+                parts.append(f"- **{table.get('identifier', 'Table')}**: {caption}")
+
+        if not parts:
+            return ""
+
+        return "\n".join(parts)
