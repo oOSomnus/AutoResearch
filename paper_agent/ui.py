@@ -28,8 +28,16 @@ class UI:
         """Initialize the UI."""
         if RICH_AVAILABLE:
             self.console = Console()
+            self._progress: Optional[Progress] = None
+            self._progress_task_id: Optional[TaskID] = None
+            self._current_step = ""
+            self._current_detail = ""
         else:
             self.console = None
+            self._progress = None
+            self._progress_task_id = None
+            self._current_step = ""
+            self._current_detail = ""
 
     def print_banner(self) -> None:
         """Print a welcome banner."""
@@ -262,6 +270,200 @@ TTL (小时): {stats.get('ttl_hours', 0)}"""
             self.console.print(msg)
         else:
             print(msg)
+
+    # Progress tracking methods
+
+    def create_progress_tracker(self, steps: List[str], description: str = "分析进度") -> Optional[TaskID]:
+        """
+        Create a progress tracker for analysis steps.
+
+        Args:
+            steps: List of step names
+            description: Description for the progress bar
+
+        Returns:
+            TaskID for the progress task (None if rich is not available)
+        """
+        if not RICH_AVAILABLE:
+            return None
+
+        self._progress = Progress(
+            *Progress.get_default_columns(),
+            console=self.console,
+            expand=True,
+        )
+
+        # Create a task for the overall progress
+        total_steps = len(steps)
+        self._progress_task_id = self._progress.add_task(
+            description,
+            total=total_steps,
+        )
+
+        # Also track individual steps if rich is available
+        self._progress_steps = steps
+        self._progress.start()
+
+        return self._progress_task_id
+
+    def update_progress(self, completed: int, total: int, step_name: str = "", detail: str = "") -> None:
+        """
+        Update the progress bar.
+
+        Args:
+            completed: Number of completed steps
+            total: Total number of steps
+            step_name: Name of current step
+            detail: Additional detail about current step
+        """
+        if not RICH_AVAILABLE or self._progress is None:
+            # Fallback: print simple progress
+            if step_name:
+                self.print_info(f"正在处理: {step_name}")
+                if detail:
+                    print(f"  {detail}")
+            return
+
+        if self._progress_task_id is not None:
+            self._progress.update(
+                self._progress_task_id,
+                completed=completed,
+                total=total,
+                description=f"正在分析: {step_name}" if step_name else "分析进度",
+            )
+
+        self._current_step = step_name
+        self._current_detail = detail
+
+    def display_live_status(self, step_name: str, step_detail: str = "") -> None:
+        """
+        Display live status during analysis.
+
+        Args:
+            step_name: Name of the current step
+            step_detail: Additional detail about the step
+        """
+        if not RICH_AVAILABLE:
+            self.print_info(f"正在处理: {step_name}")
+            if step_detail:
+                print(f"  {step_detail}")
+            return
+
+        # Update console with live status
+        if step_name != self._current_step or step_detail != self._current_detail:
+            self.console.print(f"[dim]⏳ {step_name}[/dim]")
+            if step_detail:
+                self.console.print(f"    {step_detail}", style="dim italic")
+            self._current_step = step_name
+            self._current_detail = step_detail
+
+    def finish_progress(self) -> None:
+        """Complete the progress tracking."""
+        if not RICH_AVAILABLE or self._progress is None:
+            self.print_success("分析完成!")
+            return
+
+        if self._progress_task_id is not None:
+            # Ensure progress is at 100%
+            self._progress.update(
+                self._progress_task_id,
+                completed=self._progress.tasks[0].total,
+            )
+
+        self._progress.stop()
+        self._progress = None
+        self._progress_task_id = None
+        self.print_success("分析完成!")
+
+    # Token statistics display methods
+
+    def display_token_stats(self, token_tracker, show_cost: bool = True) -> None:
+        """
+        Display token usage statistics.
+
+        Args:
+            token_tracker: TokenTracker instance with usage data
+            show_cost: Whether to show estimated cost
+        """
+        if token_tracker is None or token_tracker.api_calls == 0:
+            self.print_info("未记录到令牌使用信息")
+            return
+
+        try:
+            from .token_tracker import TokenTracker
+        except ImportError:
+            self.print_info("未记录到令牌使用信息")
+            return
+
+        stats = token_tracker.get_summary()
+
+        if self.console:
+            table = Table(title="📊 令牌使用统计", box=box.ROUNDED)
+            table.add_column("指标", style="cyan")
+            table.add_column("数值", style="green")
+
+            table.add_row("API 调用次数", f"{stats['api_calls']:,}")
+            table.add_row("输入令牌", f"{stats['input_tokens']:,}")
+            table.add_row("输出令牌", f"{stats['output_tokens']:,}")
+            table.add_row("总令牌数", f"{stats['total_tokens']:,}")
+
+            if stats['api_calls'] > 0:
+                avg_tokens = stats['total_tokens'] // stats['api_calls']
+                table.add_row("平均令牌/调用", f"{avg_tokens:,}")
+
+            if show_cost:
+                # Estimate cost (default GPT-4 pricing)
+                cost = token_tracker.estimate_cost()
+                table.add_row("预估成本 (USD)", f"${cost:.4f}")
+
+            self.console.print(table)
+
+            # Show breakdown by operation if available
+            if token_tracker.by_operation:
+                self.console.print("\n[bold]按操作细分:[/bold]")
+                op_table = Table(box=box.SIMPLE)
+                op_table.add_column("操作", style="cyan")
+                op_table.add_column("输入", style="green")
+                op_table.add_column("输出", style="yellow")
+                op_table.add_column("总计", style="magenta")
+
+                sorted_ops = sorted(
+                    token_tracker.by_operation.items(),
+                    key=lambda x: x[1].total_tokens,
+                    reverse=True,
+                )
+
+                for op, usage in sorted_ops[:10]:  # Show top 10
+                    op_table.add_row(
+                        op,
+                        f"{usage.input_tokens:,}",
+                        f"{usage.output_tokens:,}",
+                        f"{usage.total_tokens:,}",
+                    )
+
+                self.console.print(op_table)
+        else:
+            # Fallback to simple print
+            print(f"\n📊 令牌使用统计")
+            print(f"  API 调用次数: {stats['api_calls']:,}")
+            print(f"  输入令牌: {stats['input_tokens']:,}")
+            print(f"  输出令牌: {stats['output_tokens']:,}")
+            print(f"  总令牌数: {stats['total_tokens']:,}")
+            if stats['api_calls'] > 0:
+                avg_tokens = stats['total_tokens'] // stats['api_calls']
+                print(f"  平均令牌/调用: {avg_tokens:,}")
+            if show_cost:
+                cost = token_tracker.estimate_cost()
+                print(f"  预估成本: ${cost:.4f}")
+
+            if token_tracker.by_operation:
+                print("\n按操作细分:")
+                for op, usage in sorted(
+                    token_tracker.by_operation.items(),
+                    key=lambda x: x[1].total_tokens,
+                    reverse=True,
+                ):
+                    print(f"  {op}: {usage.input_tokens:,} + {usage.output_tokens:,} = {usage.total_tokens:,}")
 
     def _get_paper_type_label(self, paper_type: str) -> str:
         """Get human-readable label for paper type."""

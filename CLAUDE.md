@@ -30,6 +30,9 @@ AutoResearch is a LangGraph-based intelligent paper reading agent that analyzes 
 - **Intelligent adaptive analysis**: Dynamic analysis planning, automatic quality assessment and refinement
 - **Interactive conversation mode**: Multi-turn dialogue with paper assistant
 - **Smart content extraction**: LLM-driven title extraction, intelligent chapter detection, automatic figure/table annotation
+- **Enhanced Tier 3 analysis**: Detailed step-by-step algorithm breakdown, parameter values, and technical implementation details
+- **Progress tracking**: Visual progress bars during analysis (requires `rich` library)
+- **Token usage tracking**: Real-time token usage statistics and cost estimation (requires `tiktoken` library)
 
 ## Setup
 
@@ -143,6 +146,9 @@ autoresearch --resume checkpoint.json
 
 # Clear cache
 autoresearch --clear-cache
+
+# Show token usage statistics and cost estimation
+autoresearch --show-tokens ./paper.pdf
 ```
 
 ### Method 2: Using Python Directly (Compatible)
@@ -252,7 +258,8 @@ The project uses **LangGraph** to orchestrate conditional branching workflows th
 - **`paper_agent/history.py`** - SQLite-based analysis history management
 - **`paper_agent/batch.py`** - Batch processing coordinator
 - **`paper_agent/qa_mode.py`** - Interactive RAG-based Q&A mode
-- **`paper_agent/ui.py`** - Rich terminal UI with fallback support
+- **`paper_agent/ui.py`** - Rich terminal UI with fallback support and progress bars
+- **`paper_agent/token_tracker.py`** - Token usage tracking and cost estimation
 
 **Analysis Layer**:
 - **`paper_agent/extractors/`** - Content extractors
@@ -335,6 +342,9 @@ The TypedDict passed between nodes contains:
 - `max_iterations` - Maximum refinement iterations per dimension (default: 3)
 - `quality_threshold` - Minimum quality score to accept (default: 0.75)
 
+**Token Tracking Fields** (Phase 6):
+- `token_tracker` - TokenTracker instance for tracking API usage (optional)
+
 ## Development Notes
 
 ### Workflow Design
@@ -374,6 +384,11 @@ The TypedDict passed between nodes contains:
   - **Tier 1: 通俗理解/ Layman Understanding** - Simple explanation with everyday metaphors, accessible to non-experts
   - **Tier 2: 关键机制/Key Mechanisms** - Technical overview explaining core principles
   - **Tier 3: 具体实现/Specific Implementation** - Detailed technical steps, parameters, formulas, and code
+    - For algorithms: step-by-step breakdown with input/processing/output for each step
+    - For system architecture: component functions, data flow, and interaction methods
+    - Reference specific formulas, code snippets, or pseudocode
+    - Explain specific parameter values and their rationale
+    - Reference specific sections/figures from the paper
   - **Tier 4: 深层洞察/Deep Insights** - Research significance with external real-world examples and future directions
 - Each prompt requires 1-2 external real-world examples (not just from the paper) to illustrate concepts and applications
 

@@ -569,6 +569,33 @@ def run_adaptive_paper_analysis(
     Returns:
         The final state with the analysis results
     """
+    # Initialize UI and progress tracking
+    from .ui import get_ui
+    from .token_tracker import get_global_tracker
+
+    ui = get_ui()
+    token_tracker = get_global_tracker()
+
+    # Define expected steps for progress tracking
+    expected_steps = [
+        "获取PDF",
+        "提取内容",
+        "检测类型",
+        "规划分析",
+        "背景分析",
+        "创新分析",
+        "结果分析",
+        "生成报告",
+        "保存报告"
+    ]
+
+    # Create progress tracker if not in interactive mode
+    if research_mode != "interactive":
+        ui.create_progress_tracker(expected_steps, description="论文分析进度")
+
+    # Track completed steps
+    completed_steps = 0
+
     # Check if resuming from checkpoint
     if checkpoint_path:
         from .checkpoint import get_checkpoint_manager
@@ -576,10 +603,13 @@ def run_adaptive_paper_analysis(
         initial_state = checkpoint_mgr.load_checkpoint(checkpoint_path)
 
         if initial_state:
-            print(f"📋 从检查点恢复: {checkpoint_path}")
-            print(f"   已完成节点: {initial_state.get('completed_nodes', [])}")
+            ui.print_info(f"从检查点恢复: {checkpoint_path}")
+            completed = initial_state.get('completed_nodes', [])
+            ui.print_info(f"已完成节点: {completed}")
+            # Adjust progress based on completed nodes
+            completed_steps = min(len(completed), len(expected_steps) // 2)
         else:
-            print(f"⚠️  检查点无效，从头开始分析")
+            ui.print_warning(f"检查点无效，从头开始分析")
             initial_state = None
     else:
         initial_state = None
@@ -626,8 +656,14 @@ def run_adaptive_paper_analysis(
             "research_mode": research_mode,
             "should_exit": False,
             "max_iterations": max_iterations,
-            "quality_threshold": quality_threshold
+            "quality_threshold": quality_threshold,
+            # Token tracker
+            "token_tracker": token_tracker
         }
+
+    # Update progress for initial steps
+    ui.update_progress(completed_steps, len(expected_steps), "开始分析")
+    completed_steps += 2  # fetch_pdf and extract_content will run
 
     app = create_adaptive_paper_agent_graph(
         max_iterations=max_iterations,
@@ -637,6 +673,10 @@ def run_adaptive_paper_analysis(
 
     # Run the workflow
     final_state = app.invoke(initial_state)
+
+    # Update final progress
+    ui.update_progress(len(expected_steps), len(expected_steps), "完成")
+    ui.finish_progress()
 
     # Save to history if analysis completed successfully
     if final_state.get("report"):

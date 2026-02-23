@@ -8,6 +8,7 @@ import sys
 import argparse
 
 from paper_agent.graph import run_paper_analysis, run_adaptive_paper_analysis, create_interactive_paper_agent_graph
+from paper_agent.token_tracker import TokenTracker, get_global_tracker, set_global_tracker
 
 
 def print_banner():
@@ -157,8 +158,29 @@ def direct_mode(source: str, output_format: str = "markdown",
                interactive: bool = False,
                max_iterations: int = 3,
                quality_threshold: float = 0.75,
-               user_feedback: bool = False):
-    """Run the agent in direct mode with a specified source."""
+               user_feedback: bool = False,
+               show_tokens: bool = False):
+    """
+    Run the agent in direct mode with a specified source.
+
+    Args:
+        source: PDF file path or URL
+        output_format: Output format (markdown, html, pdf, json)
+        language: Language (zh, en)
+        detail_level: Detail level (brief, standard, detailed)
+        checkpoint_path: Path to checkpoint file for resuming
+        extract_citations: Enable citation extraction
+        analyze_figures: Enable figure analysis
+        extract_code: Enable code extraction
+        assess_reproducibility: Enable reproducibility assessment
+        qa_mode: Enable Q&A mode
+        adaptive: Enable adaptive analysis mode
+        interactive: Enable interactive Q&A mode
+        max_iterations: Maximum iterations per dimension
+        quality_threshold: Quality threshold (0-1)
+        user_feedback: Enable user feedback mode
+        show_tokens: Show token usage statistics
+    """
     print_banner()
     print(f"📎 分析源: {source}")
     print(f"📋 输出格式: {output_format}")
@@ -194,6 +216,16 @@ def direct_mode(source: str, output_format: str = "markdown",
         print(f"🔧 启用功能: {', '.join(extraction_features)}")
 
     print("-" * 60)
+
+    # Initialize token tracker if requested
+    token_tracker = None
+    if show_tokens:
+        try:
+            token_tracker = TokenTracker()
+            set_global_tracker(token_tracker)
+            print("📊 启用令牌使用统计")
+        except Exception as e:
+            print(f"⚠️  无法初始化令牌追踪: {e}")
 
     try:
         # Choose the appropriate analysis mode
@@ -321,6 +353,37 @@ def direct_mode(source: str, output_format: str = "markdown",
         if adaptive:
             print(f"🧠 模式: 自适应分析")
         print(f"\n📝 报告已生成")
+
+        # Display token statistics if enabled
+        if show_tokens and token_tracker is not None:
+            stats = token_tracker.get_summary()
+            if stats['api_calls'] > 0:
+                print("\n" + "=" * 60)
+                print("📊 令牌使用统计")
+                print("=" * 60)
+                print(f"API 调用次数: {stats['api_calls']:,}")
+                print(f"输入令牌: {stats['input_tokens']:,}")
+                print(f"输出令牌: {stats['output_tokens']:,}")
+                print(f"总令牌数: {stats['total_tokens']:,}")
+                if stats['api_calls'] > 0:
+                    avg_tokens = stats['total_tokens'] // stats['api_calls']
+                    print(f"平均令牌/调用: {avg_tokens:,}")
+
+                # Estimate cost
+                cost = token_tracker.estimate_cost()
+                print(f"预估成本 (USD): ${cost:.4f}")
+
+                # Show breakdown by operation
+                if token_tracker.by_operation:
+                    print("\n按操作细分:")
+                    sorted_ops = sorted(
+                        token_tracker.by_operation.items(),
+                        key=lambda x: x[1].total_tokens,
+                        reverse=True,
+                    )
+                    for op, usage in sorted_ops[:10]:
+                        print(f"  {op}: {usage.input_tokens:,} + {usage.output_tokens:,} = {usage.total_tokens:,}")
+                print("=" * 60)
 
     except Exception as e:
         print(f"\n❌ 分析失败: {e}")
@@ -467,6 +530,13 @@ def parse_args():
         help='对比多个论文'
     )
 
+    # Phase 6: Token tracking option
+    parser.add_argument(
+        '--show-tokens',
+        action='store_true',
+        help='显示令牌使用统计和预估成本'
+    )
+
     return parser.parse_args()
 
 
@@ -540,7 +610,8 @@ def main():
             interactive=args.interactive,
             max_iterations=args.max_iterations,
             quality_threshold=args.quality_threshold,
-            user_feedback=args.user_feedback
+            user_feedback=args.user_feedback,
+            show_tokens=args.show_tokens
         )
     else:
         interactive_mode()
