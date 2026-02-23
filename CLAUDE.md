@@ -38,7 +38,11 @@ AutoResearch is a LangGraph-based intelligent paper reading agent that analyzes 
 git clone https://github.com/oOSomnus/AutoResearch.git
 cd AutoResearch
 
-# Install using uv (recommended)
+# Install using uv tool (recommended for global installation)
+uv tool install -e .
+# Commands available: autoresearch and paper-agent
+
+# Install using uv pip (editable mode for development)
 uv pip install -e .
 
 # Or using pip
@@ -48,13 +52,29 @@ pip install -e .
 uv pip install -r requirements.txt
 
 # Or install with all optional features
+uv tool install -e ".[all]"
+# or
 uv pip install -e ".[all]"
 ```
+
+**uv tool install vs uv pip install -e:**
+
+| Installation Method | Location | Scope | Recommended For |
+|-------------------|---------|-------|----------------|
+| `uv tool install -e .` | Global tool directory | Any terminal session | Daily use, no venv activation needed |
+| `uv pip install -e .` | Current virtual environment | Current venv only | Development/debugging with frequent code changes |
 
 **Optional dependency groups:**
 - `output` - PDF output and chart generation (weasyprint, matplotlib)
 - `interactive` - Progress bars, enhanced terminal UI (tqdm, rich, click)
 - `performance` - Token counting, persistent caching (tiktoken, diskcache)
+
+Install specific optional features:
+```bash
+uv tool install -e ".[output]"
+uv pip install -e ".[interactive]"
+pip install -e ".[performance]"
+```
 
 Configure environment:
 ```bash
@@ -73,7 +93,9 @@ After installation, you can run the agent in three ways:
 
 ### Method 1: Using CLI Commands (Recommended)
 
-The `uv pip install -e .` command creates two CLI entry points:
+Installation creates two CLI entry points:
+- `uv tool install -e .` makes them available globally (any terminal)
+- `uv pip install -e .` makes them available in the current virtual environment
 
 ```bash
 # Interactive mode (prompts for PDF path/URL)
@@ -251,7 +273,7 @@ The project uses **LangGraph** to orchestrate conditional branching workflows th
 - **`pyproject.toml`** - Python project configuration with modern packaging standard
   - CLI entry points: `autoresearch` and `paper-agent`
   - Optional dependency groups: output, interactive, performance, all, dev
-  - Build system: hatchling
+  - Build system: hatchling with support for `uv tool install` global installation
   - Tool configurations: black, isort, ruff, mypy, pytest, coverage
 - **`paper_agent/config.py`** - Configuration management
 - **`paper_agent/types.py`** - Data structure definitions including:

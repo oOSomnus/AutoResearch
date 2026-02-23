@@ -225,22 +225,35 @@ graph TB
 git clone https://github.com/oOSomnus/AutoResearch.git
 cd AutoResearch
 
-# 方法 1: 使用 uv 安装（推荐）
+# 方法 1: 使用 uv tool 安装（全局安装，推荐）
+uv tool install -e .
+# 安装后可直接使用 autoresearch 或 paper-agent 命令
+
+# 方法 2: 使用 uv pip 安装（当前项目可编辑模式）
 uv pip install -e .
 
-# 方法 2: 使用 pip 安装
+# 方法 3: 使用 pip install -e 安装
 pip install -e .
 
-# 方法 3: 从 requirements.txt 安装（兼容旧版）
+# 方法 4: 从 requirements.txt 安装（兼容旧版）
 uv pip install -r requirements.txt
 # 或
 pip install -r requirements.txt
 
-# 方法 4: 安装所有可选功能
+# 方法 5: 安装所有可选功能
+uv tool install -e ".[all]"
+# 或
 uv pip install -e ".[all]"
 # 或
 pip install -e ".[all]"
 ```
+
+**`uv tool install` vs `uv pip install -e` 的区别：**
+
+| 安装方式 | 安装位置 | 使用范围 | 推荐场景 |
+|---------|---------|---------|---------|
+| `uv tool install -e .` | 全局工具目录 | 任何终端会话 | 日常使用，无需激活虚拟环境 |
+| `uv pip install -e .` | 当前虚拟环境 | 仅当前虚拟环境 | 开发调试，需要频繁修改代码 |
 
 **可选功能分组：**
 
@@ -251,9 +264,9 @@ pip install -e ".[all]"
 你可以单独安装需要的可选功能：
 
 ```bash
-uv pip install -e ".[output]"
+uv tool install -e ".[output]"
 uv pip install -e ".[interactive]"
-uv pip install -e ".[performance]"
+pip install -e ".[performance]"
 ```
 
 ### 配置
