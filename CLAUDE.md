@@ -200,7 +200,13 @@ The project uses **LangGraph** to orchestrate conditional branching workflows th
   - `create_paper_agent_graph()` - Standard linear workflow (backward compatible)
   - `create_adaptive_paper_agent_graph()` - Adaptive workflow with quality assessment
   - `create_interactive_paper_agent_graph()` - Interactive Q&A workflow
-- **`paper_agent/nodes.py`** - Contains all node functions including adaptive decision nodes
+- **`paper_agent/nodes/`** - Node functions organized by category:
+  - `base.py` - AgentState TypedDict and get_llm() utility
+  - `input.py` - PDF fetching and content extraction nodes
+  - `analysis.py` - Core analysis dimension nodes
+  - `output.py` - Report generation and saving nodes
+  - `adaptive.py` - Adaptive analysis planning and quality assessment
+  - `extraction.py` - Content extraction nodes
 - **`paper_agent/prompts.py`** - Bilingual prompt templates including planning and quality assessment
 
 **Processing Layer**:
@@ -366,11 +372,12 @@ The TypedDict passed between nodes contains:
 ### Extensibility
 
 **Adding a new node**:
-1. Add node function in `paper_agent/nodes.py`
-2. Update `AgentState` in `paper_agent/nodes.py` if needed
+1. Add node function in `paper_agent/nodes/` (choose appropriate file: base.py, input.py, analysis.py, output.py, adaptive.py, or extraction.py)
+2. Update `AgentState` in `paper_agent/nodes/base.py` if needed
 3. Add routing function in `paper_agent/graph.py`
 4. Add node to workflow in `create_paper_agent_graph()` or `create_adaptive_paper_agent_graph()`
-5. Add prompt template in `paper_agent/prompts.py`
+5. Export the node in `paper_agent/nodes/__init__.py`
+6. Add prompt template in `paper_agent/prompts.py`
 
 **Adding a new output format**:
 1. Create new formatter class in `paper_agent/formatters/` inheriting from `BaseFormatter`
@@ -380,9 +387,10 @@ The TypedDict passed between nodes contains:
 
 **Adding a new extraction feature**:
 1. Create extractor class in `paper_agent/extractors/`
-2. Add corresponding node function in `paper_agent/nodes.py`
-3. Add prompt template in `paper_agent/prompts.py`
-4. Add CLI flag in main.py
+2. Add corresponding node function in `paper_agent/nodes/extraction.py`
+3. Export the node in `paper_agent/nodes/__init__.py`
+4. Add prompt template in `paper_agent/prompts.py`
+5. Add CLI flag in main.py
 
 **Adding a new adaptive analysis dimension**:
 1. Ensure the dimension is in `plan_analysis` prompts

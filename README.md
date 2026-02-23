@@ -139,7 +139,7 @@ graph TB
 
     subgraph Core Layer[Core Layer]
         B[graph.py<br/>LangGraph 工作流]
-        C[nodes.py<br/>节点函数]
+        C[nodes/<br/>节点函数模块]
         D[prompts.py<br/>提示词模板]
     end
 
@@ -471,7 +471,14 @@ AutoResearch/
 ├── main.py                   # 命令行入口
 ├── paper_agent/
 │   ├── graph.py              # LangGraph 工作流定义（标准 + 自适应 + 交互式）
-│   ├── nodes.py              # 节点函数实现（含自适应决策节点）
+│   ├── nodes/                # 节点函数模块（按类别组织）
+│   │   ├── __init__.py       # 导出所有节点（向后兼容）
+│   │   ├── base.py           # AgentState 和 get_llm()
+│   │   ├── input.py          # PDF 获取和内容提取节点
+│   │   ├── analysis.py       # 核心分析维度节点
+│   │   ├── output.py         # 报告生成和保存节点
+│   │   ├── adaptive.py       # 自适应分析和质量评估节点
+│   │   └── extraction.py     # 内容提取节点
 │   ├── prompts.py            # 提示词模板（含分析和质量评估提示）
 │   ├── pdf_reader.py         # PDF 读取工具
 │   ├── chunking.py           # 章节提取模块
