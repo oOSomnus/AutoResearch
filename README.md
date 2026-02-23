@@ -215,6 +215,7 @@ graph TB
 
 - Python 3.8+
 - OpenAI 兼容的 API（如 OpenAI、Azure、Claude 等）
+- uv（推荐）或 pip
 
 ### 安装
 
@@ -223,10 +224,35 @@ graph TB
 git clone https://github.com/oOSomnus/AutoResearch.git
 cd AutoResearch
 
-# 安装依赖
+# 方法 1: 使用 uv 安装（推荐）
+uv pip install -e .
+
+# 方法 2: 使用 pip 安装
+pip install -e .
+
+# 方法 3: 从 requirements.txt 安装（兼容旧版）
 uv pip install -r requirements.txt
-# 或者使用 pip
+# 或
 pip install -r requirements.txt
+
+# 方法 4: 安装所有可选功能
+uv pip install -e ".[all]"
+# 或
+pip install -e ".[all]"
+```
+
+**可选功能分组：**
+
+- `output` - PDF 输出和图表生成
+- `interactive` - 进度条、增强终端 UI、交互体验
+- `performance` - Token 计数、持久化缓存
+
+你可以单独安装需要的可选功能：
+
+```bash
+uv pip install -e ".[output]"
+uv pip install -e ".[interactive]"
+uv pip install -e ".[performance]"
 ```
 
 ### 配置
@@ -245,36 +271,82 @@ OPENAI_API_KEY=your_api_key_here
 MODEL_NAME=gpt-4
 ```
 
+### 安装验证
+
+安装完成后，你可以使用以下命令验证安装：
+
+```bash
+# 验证命令行工具已安装
+autoresearch --help
+# 或
+paper-agent --help
+
+# 也可以使用 python 直接运行（兼容方式）
+python main.py --help
+```
+
 ## 使用方法
 
-### 交互式模式
+安装完成后，有三种方式使用 AutoResearch：
 
-运行程序后按提示输入 PDF 路径或 URL：
+### 方式 1: 使用 CLI 命令（推荐）
+
+安装后会自动创建 `autoresearch` 和 `paper-agent` 命令，可以直接在终端使用：
+
+```bash
+# 交互式模式
+autoresearch
+
+# 或使用别名
+paper-agent
+```
+
+### 方式 2: 直接指定论文文件
+
+```bash
+# 使用 autoresearch 命令
+autoresearch ./paper.pdf
+autoresearch https://arxiv.org/pdf/2305.xxxxx.pdf
+
+# 使用 paper-agent 命令
+paper-agent ./paper.pdf
+```
+
+### 方式 3: 使用 python 直接运行（兼容方式）
 
 ```bash
 python main.py
+python main.py ./paper.pdf
 ```
 
-### 直接模式
+### 指定输出格式
 
 ```bash
-# 基础用法
-python main.py ./paper.pdf
-python main.py https://arxiv.org/pdf/xxxxx.pdf
+# 使用 CLI 命令
+autoresearch --format html ./paper.pdf
+autoresearch --format pdf ./paper.pdf
 
-# 指定输出格式
+# 或使用 python（兼容方式）
 python main.py --format html ./paper.pdf
-python main.py --format pdf ./paper.pdf
+```
 
-# 指定语言
-python main.py --language en ./paper.pdf
+### 指定语言
 
-# 指定详细程度
-python main.py --detail brief ./paper.pdf
-python main.py --detail detailed ./paper.pdf
+```bash
+autoresearch --language en ./paper.pdf
+```
 
-# 组合选项
-python main.py --format html --language en --detail detailed ./paper.pdf
+### 指定详细程度
+
+```bash
+autoresearch --detail brief ./paper.pdf
+autoresearch --detail detailed ./paper.pdf
+```
+
+### 组合选项
+
+```bash
+autoresearch --format html --language en --detail detailed ./paper.pdf
 ```
 
 ### 批量处理
@@ -282,7 +354,7 @@ python main.py --format html --language en --detail detailed ./paper.pdf
 创建一个文本文件，每行一个 PDF 路径或 URL：
 
 ```bash
-python main.py --batch papers_list.txt
+autoresearch --batch papers_list.txt
 ```
 
 ### 历史记录
@@ -290,32 +362,32 @@ python main.py --batch papers_list.txt
 查看之前的分析历史：
 
 ```bash
-python main.py --history
+autoresearch --history
 ```
 
 ### 高级功能
 
 ```bash
 # 启用引用提取
-python main.py --extract-citations ./paper.pdf
+autoresearch --extract-citations ./paper.pdf
 
 # 启用图表分析
-python main.py --analyze-figures ./paper.pdf
+autoresearch --analyze-figures ./paper.pdf
 
 # 启用代码提取
-python main.py --extract-code ./paper.pdf
+autoresearch --extract-code ./paper.pdf
 
 # 启用可复现性评估
-python main.py --assess-reproducibility ./paper.pdf
+autoresearch --assess-reproducibility ./paper.pdf
 
 # 多论文对比
-python main.py --compare paper1.pdf paper2.pdf paper3.pdf
+autoresearch --compare paper1.pdf paper2.pdf paper3.pdf
 
 # 从检查点恢复
-python main.py --resume checkpoint.json
+autoresearch --resume checkpoint.json
 
 # 清除缓存
-python main.py --clear-cache
+autoresearch --clear-cache
 ```
 
 ### 智能自适应分析
@@ -324,13 +396,13 @@ python main.py --clear-cache
 
 ```bash
 # 启用自适应分析（默认参数）
-python main.py --adaptive ./paper.pdf
+autoresearch --adaptive ./paper.pdf
 
 # 自定义迭代次数和质量阈值
-python main.py --adaptive --max-iterations 5 --quality-threshold 0.8 ./paper.pdf
+autoresearch --adaptive --max-iterations 5 --quality-threshold 0.8 ./paper.pdf
 
 # 自适应分析 + 自定义输出格式
-python main.py --adaptive --format html --language en ./paper.pdf
+autoresearch --adaptive --format html --language en ./paper.pdf
 ```
 
 **自适应分析特性**：
@@ -345,10 +417,10 @@ python main.py --adaptive --format html --language en ./paper.pdf
 
 ```bash
 # 启用交互式对话模式
-python main.py --interactive ./paper.pdf
+autoresearch --interactive ./paper.pdf
 
 # 交互式模式 + 自适应分析
-python main.py --adaptive --interactive ./paper.pdf
+autoresearch --adaptive --interactive ./paper.pdf
 ```
 
 **交互模式特性**：
@@ -361,7 +433,8 @@ python main.py --adaptive --interactive ./paper.pdf
 
 ```
 AutoResearch/
-├── main.py                    # 命令行入口
+├── pyproject.toml            # 项目配置（Python 打包标准）
+├── main.py                   # 命令行入口
 ├── paper_agent/
 │   ├── graph.py              # LangGraph 工作流定义（标准 + 自适应 + 交互式）
 │   ├── nodes.py              # 节点函数实现（含自适应决策节点）
@@ -397,7 +470,7 @@ AutoResearch/
 │   ├── research_assistant.py # 研究助手
 │   ├── types.py              # 数据类型（含自适应分析类型）
 │   ├── retry.py              # 重试逻辑
-│   └── __init__.py
+│   └── __init__.py           # 包初始化
 ├── test/
 │   ├── __init__.py
 │   ├── test_adaptive_graph.py    # 自适应图测试
@@ -405,7 +478,7 @@ AutoResearch/
 │   └── test_interactive_mode.py   # 交互模式测试
 ├── docs/
 │   └── architecture.md       # 架构文档
-├── requirements.txt           # 项目依赖
+├── requirements.txt           # 项目依赖（兼容旧版安装方式）
 ├── .env.example             # 环境变量模板
 ├── CLAUDE.md                # Claude Code 指导文档
 └── README.md                 # 本文件
@@ -413,42 +486,40 @@ AutoResearch/
 
 ## CLI 参数参考
 
+```bash
+# 方式 1: 使用 CLI 命令（推荐）
+autoresearch [选项] [source]
+paper-agent [选项] [source]
+
+# 方式 2: 使用 python（兼容方式）
+python main.py [选项] [source]
+
+# 查看帮助
+autoresearch --help
 ```
-usage: main.py [-h] [--format {markdown,html,pdf,json}] [--language {zh,en}]
-               [--detail {brief,standard,detailed}] [--resume PATH]
-               [--clear-cache] [--batch FILE] [--history] [--qa-mode]
-               [--extract-citations] [--analyze-figures] [--extract-code]
-               [--assess-reproducibility] [--compare PDF [PDF ...]]
-               [--adaptive, -a] [--interactive, -i] [--max-iterations N]
-               [--quality-threshold T] [--user-feedback]
-               [source]
 
-positional arguments:
-  source                PDF文件路径或URL
+**可用选项：**
 
-optional arguments:
-  -h, --help            显示帮助信息
-  --format, -f           输出格式: markdown, html, pdf, json
-  --language, -l         语言: zh (中文) / en (英文)
-  --detail, -d           详细程度: brief / standard / detailed
-  --resume PATH          从检查点恢复分析
-  --clear-cache          清除缓存
-  --batch FILE           批量处理文件
-  --history              查看分析历史
-  --qa-mode              启用交互式问答模式
-  --extract-citations    启用引用提取和分析
-  --analyze-figures      启用图表分析
-  --extract-code         启用代码提取
-  --assess-reproducibility 启用可复现性评估
-  --compare PDF [PDF ...] 对比多个论文
-
-自适应分析选项：
-  --adaptive, -a         启用智能自适应分析模式
-  --interactive, -i      启用交互式对话模式
-  --max-iterations N     最大迭代次数（默认: 3）
-  --quality-threshold T  质量阈值 0-1（默认: 0.75）
-  --user-feedback        启用用户反馈模式
-```
+| 选项 | 简写 | 说明 | 默认值 |
+|------|------|------|--------|
+| `--format` | `-f` | 输出格式 (markdown/html/pdf/json) | markdown |
+| `--language` | `-l` | 语言 (zh/en) | zh |
+| `--detail` | `-d` | 详细程度 (brief/standard/detailed) | standard |
+| `--adaptive` | `-a` | 启用智能自适应分析模式 | - |
+| `--interactive` | `-i` | 启用交互式对话模式 | - |
+| `--max-iterations` | - | 最大迭代次数 | 3 |
+| `--quality-threshold` | - | 质量阈值 0-1 | 0.75 |
+| `--user-feedback` | - | 启用用户反馈模式 | - |
+| `--resume` | - | 从检查点恢复分析 | - |
+| `--clear-cache` | - | 清除缓存 | - |
+| `--batch` | - | 批量处理文件 | - |
+| `--history` | - | 查看分析历史 | - |
+| `--qa-mode` | - | 启用交互式问答模式 | - |
+| `--extract-citations` | - | 启用引用提取和分析 | - |
+| `--analyze-figures` | - | 启用图表分析 | - |
+| `--extract-code` | - | 启用代码提取 | - |
+| `--assess-reproducibility` | - | 启用可复现性评估 | - |
+| `--compare` | - | 对比多个论文 | - |
 
 ## 开发说明
 

@@ -33,10 +33,30 @@ AutoResearch is a LangGraph-based intelligent paper reading agent that analyzes 
 ## Setup
 
 ```bash
-# Install dependencies
+# Clone repository
+git clone https://github.com/oOSomnus/AutoResearch.git
+cd AutoResearch
+
+# Install using uv (recommended)
+uv pip install -e .
+
+# Or using pip
+pip install -e .
+
+# Or from requirements.txt (legacy)
 uv pip install -r requirements.txt
 
-# Configure environment
+# Or install with all optional features
+uv pip install -e ".[all]"
+```
+
+**Optional dependency groups:**
+- `output` - PDF output and chart generation (weasyprint, matplotlib)
+- `interactive` - Progress bars, enhanced terminal UI (tqdm, rich, click)
+- `performance` - Token counting, persistent caching (tiktoken, diskcache)
+
+Configure environment:
+```bash
 cp .env.example .env
 # Edit .env with your OPENAI_API_BASE and OPENAI_API_KEY
 ```
@@ -46,15 +66,63 @@ Required environment variables (in `.env`):
 - `OPENAI_API_KEY` - API authentication key
 - `MODEL_NAME` - Model to use (default: gpt-4)
 
-Optional dependencies for enhanced features:
-- `matplotlib>=3.8.0` - Chart generation
-- `weasyprint>=60.0` - PDF output
-- `rich>=13.7.0` - Enhanced terminal UI
-- `tqdm>=4.66.0` - Progress bars
-- `tiktoken>=0.5.0` - Token counting
-- `diskcache>=5.6.0` - Persistent caching
-
 ## Running the Agent
+
+After installation, you can run the agent in three ways:
+
+### Method 1: Using CLI Commands (Recommended)
+
+The `uv pip install -e .` command creates two CLI entry points:
+
+```bash
+# Interactive mode (prompts for PDF path/URL)
+autoresearch
+# or
+paper-agent
+
+# Direct mode with file path or URL
+autoresearch ./paper.pdf
+autoresearch https://arxiv.org/pdf/xxxx.pdf
+
+# Specify output format
+autoresearch --format html ./paper.pdf
+autoresearch --format pdf ./paper.pdf
+
+# Specify language
+autoresearch --language en ./paper.pdf
+
+# Specify detail level
+autoresearch --detail brief ./paper.pdf
+
+# Adaptive analysis mode
+autoresearch --adaptive ./paper.pdf
+
+# Interactive Q&A mode
+autoresearch --interactive ./paper.pdf
+
+# Batch processing
+autoresearch --batch papers_list.txt
+
+# View history
+autoresearch --history
+
+# Enable advanced features
+autoresearch --extract-citations ./paper.pdf
+autoresearch --analyze-figures ./paper.pdf
+autoresearch --extract-code ./paper.pdf
+autoresearch --assess-reproducibility ./paper.pdf
+
+# Multi-paper comparison
+autoresearch --compare paper1.pdf paper2.pdf
+
+# Resume from checkpoint
+autoresearch --resume checkpoint.json
+
+# Clear cache
+autoresearch --clear-cache
+```
+
+### Method 2: Using Python Directly (Compatible)
 
 ```bash
 # Interactive mode (prompts for PDF path/URL)
@@ -64,48 +132,14 @@ python main.py
 python main.py ./paper.pdf
 python main.py https://arxiv.org/pdf/xxxx.pdf
 
-# Specify output format
-python main.py --format html ./paper.pdf
-python main.py --format pdf ./paper.pdf
-
-# Specify language
-python main.py --language en ./paper.pdf
-
-# Specify detail level
-python main.py --detail brief ./paper.pdf
-
-# Batch processing
-python main.py --batch papers_list.txt
-
-# View history
-python main.py --history
-
-# Enable advanced features
-python main.py --extract-citations ./paper.pdf
-python main.py --analyze-figures ./paper.pdf
-python main.py --extract-code ./paper.pdf
-python main.py --assess-reproducibility ./paper.pdf
-
-# Multi-paper comparison
-python main.py --compare paper1.pdf paper2.pdf
-
-# Resume from checkpoint
-python main.py --resume checkpoint.json
-
-# Clear cache
-python main.py --clear-cache
-
-# Adaptive analysis mode (intelligent planning + quality assessment)
+# All options work the same as CLI commands
 python main.py --adaptive ./paper.pdf
-python main.py --adaptive --max-iterations 5 --quality-threshold 0.8 ./paper.pdf
-
-# Interactive Q&A mode (converse with paper assistant)
 python main.py --interactive ./paper.pdf
+```
 
-# Combined adaptive + interactive mode
-python main.py --adaptive --interactive ./paper.pdf
+### Method 3: Run Graph Directly (for testing)
 
-# Run graph directly (for testing)
+```bash
 python -m paper_agent.graph <pdf_path_or_url>
 ```
 
@@ -207,6 +241,11 @@ The project uses **LangGraph** to orchestrate conditional branching workflows th
   - `test_interactive_mode.py` - Tests for interactive Q&A mode
 
 **Support Layer**:
+- **`pyproject.toml`** - Python project configuration with modern packaging standard
+  - CLI entry points: `autoresearch` and `paper-agent`
+  - Optional dependency groups: output, interactive, performance, all, dev
+  - Build system: hatchling
+  - Tool configurations: black, isort, ruff, mypy, pytest, coverage
 - **`paper_agent/config.py`** - Configuration management
 - **`paper_agent/types.py`** - Data structure definitions including:
   - `AnalysisDecision` - Analysis planning result from LLM (Phase 5)
